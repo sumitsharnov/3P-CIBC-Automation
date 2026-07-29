@@ -1,0 +1,15 @@
+{
+  "key": "CAP-15",
+  "fields": {
+    "project": { "key": "CAP", "name": "CIBC AI Pod" },
+    "issuetype": { "name": "Story" },
+    "summary": "Sign-In (Login) with demo credentials",
+    "status": { "name": "To Do" },
+    "priority": { "name": "High" },
+    "labels": ["auth", "login", "demo-app"],
+    "description": {
+      "type": "doc",
+      "text": "As a demo user, I want to sign on to the App Bank demo with a fixed demo/demo credential pair, so that I can access the mock accounts dashboard without needing a real backend or real credentials.\n\nThis is a fictional demo mockup (App Bank) — not connected to any real banking backend. The sign-on page must clearly communicate that it's a demo, and no real credential validation happens beyond checking against the hardcoded demo/demo pair.\n\nAcceptance Criteria:\n1. Given a user is on the sign-on page, when they enter username 'demo' (case-insensitive) and password 'demo', then they are redirected to the accounts page.\n2. Given a user enters any username/password combination that isn't the demo/demo pair, when they submit, then an inline error message is shown: 'Invalid card number or password. Please try again (demo / demo).' and they remain on the sign-on page.\n3. Given a user submits the sign-on form with empty username and password fields, when they click Sign On, then the same invalid-credentials error is shown (no separate 'required field' validation exists).\n4. The sign-on page must display a visible disclaimer that this is a demo mockup and real credentials should not be entered.\n5. The page provides navigation links to 'Forgot password?' and 'Register' flows, which must be reachable but are out of scope for this ticket's test coverage.\n6. A 'Remember this device' checkbox is present but has no persisted behavior to verify (decorative only in this mock).\n7. Separately, there exists a broken sign-on demo page (/login-broken, tracked in CAP-18) that simulates a persistent 503-style failure even with correct credentials — that page is explicitly out of scope for this ticket and must not be conflated with the working /login flow.\n\nOut of scope: password reset flow, registration flow, real authentication/backend integration, session persistence, 'remember device' functionality.\n\nOpen questions:\n- Is username matching intended to be case-insensitive only for 'demo', or should whitespace-trimming also be verified (e.g. ' demo ' with leading/trailing spaces)?\n- Should there be a distinct test path confirming the broken /login-broken page is NOT reachable from the main /login page's navigation (to avoid QA accidentally testing the wrong page)?"
+    }
+  }
+}

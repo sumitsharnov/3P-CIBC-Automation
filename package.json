@@ -1,0 +1,18 @@
+{
+  "name": "bank-qa-automation-pipeline",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Validation tooling for the CIBC AI MVP agent pipeline (Java/Maven test framework lives in this repo's root; this package.json is only for the JS-based schema validation step).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "validate:research-output": "node scripts/validate-research-output.mjs",
+    "check:ambiguity-gate": "node scripts/check-ambiguity-gate.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

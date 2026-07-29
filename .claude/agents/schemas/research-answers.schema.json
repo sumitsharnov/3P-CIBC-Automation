@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "research-answers.schema.json",
+  "title": "Research Agent Ambiguity Answers",
+  "description": "Human answers to ambiguities raised in <TICKET>.requirements.json, so answers survive past a single chat session. Design Agent (and any later agent) must read this file if present and treat its answers as authoritative over its own reading of the ticket or the code.",
+  "type": "object",
+  "required": ["ticket", "answers"],
+  "additionalProperties": false,
+  "properties": {
+    "ticket": {
+      "type": "string",
+      "description": "Ticket ID this answers file belongs to, e.g. CAP-19. Must match the ticket.id in the corresponding <TICKET>.requirements.json."
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["questionId", "answer", "answeredBy", "answeredAt"],
+        "additionalProperties": false,
+        "properties": {
+          "questionId": {
+            "type": "string",
+            "pattern": "^Q-[0-9]+$",
+            "description": "Must match an ambiguities[].id from the corresponding requirements.json."
+          },
+          "answer": {
+            "type": "string",
+            "description": "The human's answer, in plain language. Design Agent treats this as the resolved, authoritative decision for this question."
+          },
+          "answeredBy": {
+            "type": "string",
+            "description": "Name of the person who answered, e.g. \"Sumit Kumar1\"."
+          },
+          "answeredAt": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "description": "Date the answer was given, YYYY-MM-DD."
+          }
+        }
+      }
+    }
+  }
+}

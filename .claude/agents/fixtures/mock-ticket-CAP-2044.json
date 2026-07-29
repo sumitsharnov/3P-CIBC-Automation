@@ -1,0 +1,24 @@
+{
+  "id": "CAP-2044",
+  "title": "Pay Bills: validate amount before submitting a payment",
+  "type": "Story",
+  "url": null,
+  "reporter": "product-owner@example.com",
+  "description": "Currently the One-time payment form on the Pay Bills page lets a customer submit whatever they type into the Amount field. We need basic validation before the payment is submitted so customers get clear feedback instead of a confusing result. This came out of demo feedback where a reviewer typed a letter into the amount box and the app behaved oddly.\n\nScope is the One-time payment form only (the Saved payees quick-pay buttons just scroll/focus that same form, so this covers both entry points).",
+  "acceptanceCriteria": [
+    "Given the customer is on the Pay Bills page, when they submit the one-time payment form with a non-numeric amount (e.g. \"abc\"), then they should see an inline error and no payment should go through.",
+    "Given the customer enters an amount of $0 or a negative number, then they should see an inline error and no payment should go through.",
+    "Given the customer enters an amount greater than the available balance of the selected 'Pay from' account, then they should see a clear insufficient funds error and no payment should go through.",
+    "Given the customer enters a valid amount within their balance, then the payment should submit successfully as it does today."
+  ],
+  "comments": [
+    {
+      "author": "dev1@example.com",
+      "text": "Do we also need to cap the number of decimal places? E.g. someone pastes in 40.999. Not called out in the ACs, raising it here."
+    },
+    {
+      "author": "qa1@example.com",
+      "text": "What should happen if the account balance changes between page load and submit (e.g. another payment already went through in a different tab)? Not sure if that's in scope for this ticket or a separate one."
+    }
+  ]
+}

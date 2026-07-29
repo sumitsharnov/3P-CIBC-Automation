@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "research-agent-output.schema.json",
+  "title": "Research Agent Output — Requirements Baseline",
+  "description": "The only thing the Research Agent produces. Every downstream agent (Design Agent first) consumes this shape, not prose. Fields the agent cannot support with evidence from the ticket must be left as empty arrays, not invented.",
+  "type": "object",
+  "required": ["ticket", "summary", "acceptanceCriteria", "requirements", "edgeCases", "ambiguities", "targetArea"],
+  "additionalProperties": false,
+  "properties": {
+    "ticket": {
+      "type": "object",
+      "required": ["id", "title", "type", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "e.g. CAP-1234" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["story", "bug", "task"] },
+        "source": { "type": "string", "enum": ["jira", "mock"], "description": "Was this pulled live from Jira MCP, or read from a mock fixture file?" },
+        "url": { "type": ["string", "null"] }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "description": "One-paragraph plain-English restatement of what the ticket is asking for. Not a copy-paste of the description."
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "testable"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^AC-[0-9]+$" },
+          "text": { "type": "string" },
+          "testable": {
+            "type": "boolean",
+            "description": "True only if this AC describes an observable, assertable behavior of the feature under test — something a Selenium/Cucumber scenario can directly check. False for: (a) ACs too vague to assert on (e.g. \"the page should feel fast\") — flag it, don't silently sharpen it into something the ticket didn't say; (b) ACs that are really scope notes, exclusions, or meta-commentary about a DIFFERENT feature/ticket rather than a behavior of this one (e.g. \"page X is out of scope and belongs to ticket Y\") — these are worth recording for context but are not themselves a test case. testable does NOT mean \"in scope\" — an AC can be in scope and still untestable-as-written, or out-of-scope-flavored text that still happens to assert something checkable."
+          }
+        }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "description": "Concrete, atomic requirements derived from the ACs and description. One behavior per entry.",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "type", "relatedAC"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^REQ-[0-9]+$" },
+          "text": { "type": "string" },
+          "type": { "type": "string", "enum": ["functional", "non-functional"] },
+          "relatedAC": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "IDs of acceptanceCriteria this requirement traces back to. Empty array if it's inferred from description/comments rather than a listed AC."
+          }
+        }
+      }
+    },
+    "edgeCases": {
+      "type": "array",
+      "description": "Boundary/negative/error conditions implied but not explicitly spelled out as an AC — the kind of thing a good QA engineer would ask about.",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "rationale"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^EC-[0-9]+$" },
+          "text": { "type": "string" },
+          "rationale": { "type": "string", "description": "Why this edge case matters — what breaks if it's untested." },
+          "relatedRequirement": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "IDs of requirements this edge case protects. Optional — empty or omitted if the edge case isn't tied to a specific requirement."
+          }
+        }
+      }
+    },
+    "ambiguities": {
+      "type": "array",
+      "description": "Open questions the ticket doesn't answer. Surfaced for a human, not guessed at.",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "impact"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^Q-[0-9]+$" },
+          "text": { "type": "string" },
+          "impact": { "type": "string", "description": "What decision downstream is blocked or risked by not resolving this." },
+          "blocking": {
+            "type": "boolean",
+            "description": "True if guessing wrong here would cause downstream agents to write tests that certify the WRONG behavior as correct. False if downstream can proceed under a clearly-stated assumption. If omitted, the orchestrator treats it as TRUE (fail-safe)."
+          }
+        }
+      }
+    },
+    "targetArea": {
+      "type": "object",
+      "required": ["pages"],
+      "additionalProperties": false,
+      "properties": {
+        "pages": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "bank-app page(s) this ticket touches, e.g. [\"Login\"], as named in src/pages/."
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}
