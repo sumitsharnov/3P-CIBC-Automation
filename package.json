@@ -9,6 +9,7 @@
   },
   "scripts": {
     "validate:research-output": "node scripts/validate-research-output.mjs",
+    "validate:design-output": "node scripts/validate-research-output.mjs",
     "check:ambiguity-gate": "node scripts/check-ambiguity-gate.mjs",
     "bddgen": "bddgen",
     "test:e2e": "npm run bddgen && playwright test",

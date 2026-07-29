@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "design-agent-output.schema.json",
+  "title": "Design Agent Output — Test Plan",
+  "description": "The only thing the Design Agent produces. Code Agent consumes this shape, not prose, and owns all file writing — Design Agent plans, it does not write test files. Every requirement from the source requirements.json must appear in some scenario's coversREQ or in outOfScope; the validator (not just this schema) enforces that cross-file, since JSON Schema alone can't check it.",
+  "type": "object",
+  "required": ["ticket", "scenarios", "assumptions", "outOfScope"],
+  "additionalProperties": false,
+  "properties": {
+    "ticket": {
+      "type": "object",
+      "required": ["id", "requirementsFile"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "e.g. CAP-19" },
+        "requirementsFile": {
+          "type": "string",
+          "description": "Path (relative to repo root) to the <TICKET>.requirements.json this plan was built from, e.g. agent-output/ResearchAgent-Output/CAP-19.requirements.json."
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "description": "One per test scenario. Not 1:1 with ACs — one AC may need multiple scenarios (happy-path + negative), or several related ACs may collapse into one scenario. The coversAC/coversREQ/coversEC arrays are what actually records the mapping.",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "tags", "steps", "coversAC", "coversREQ", "coversEC", "type", "reuse", "newArtifacts"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^SC-[0-9]+$" },
+          "title": {
+            "type": "string",
+            "description": "Gherkin scenario name, in business language — this is what a stakeholder reads, not a technical description."
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^@" },
+            "minItems": 1,
+            "description": "e.g. [\"@dashboard\"]. Every scenario must be taggable to run alone."
+          },
+          "steps": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "Given/When/Then outline in plain text — this is a scenario outline for Code Agent to turn into Gherkin + step definitions, not code itself."
+          },
+          "coversAC": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^AC-[0-9]+$" },
+            "description": "acceptanceCriteria IDs from the baseline this scenario addresses. May be empty if this scenario only covers requirements/edge cases with no direct AC."
+          },
+          "coversREQ": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^REQ-[0-9]+$" },
+            "description": "requirements IDs from the baseline this scenario verifies. Every REQ in the baseline must show up here in some scenario, or in outOfScope — never neither."
+          },
+          "coversEC": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^EC-[0-9]+$" },
+            "description": "edgeCases IDs from the baseline this scenario exercises. May be empty — not every scenario needs to be edge-case-driven — but edge cases are first-class: each EC in the baseline should land in some scenario's coversEC or in outOfScope with a reason, not be silently dropped."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["happy-path", "negative", "boundary"]
+          },
+          "reuse": {
+            "type": "array",
+            "description": "Existing artifacts in this repo this scenario should reuse. Honest emptiness is expected and fine — the suite is small; don't invent reuse that isn't real.",
+            "items": {
+              "type": "object",
+              "required": ["path", "kind", "why"],
+              "additionalProperties": false,
+              "properties": {
+                "path": { "type": "string", "description": "Path relative to repo root, e.g. pages/BasePage.ts." },
+                "kind": { "type": "string", "enum": ["page-object", "step-definition", "fixture"] },
+                "why": { "type": "string", "description": "What specifically this scenario reuses from it and why it fits, not just that it exists." }
+              }
+            }
+          },
+          "newArtifacts": {
+            "type": "array",
+            "description": "What Code Agent must create for this scenario. Design Agent proposes paths/purpose; Code Agent does the actual writing.",
+            "items": {
+              "type": "object",
+              "required": ["kind", "proposedPath", "purpose"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "type": "string", "enum": ["feature-file", "page-object", "step-definition", "fixture"] },
+                "proposedPath": { "type": "string", "description": "Path relative to repo root, e.g. pages/DashboardPage.ts." },
+                "purpose": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Required, may be empty. Every non-blocking ambiguity from the baseline that Design Agent proceeded past goes here, plus any new assumptions Design Agent itself had to make. These must not silently vanish — Coverage Agent surfaces them at the end. If a human answers file resolved an ambiguity, that ambiguity does NOT need an entry here (it's resolved, not assumed) — but note in targetAreaNotes-equivalent reasoning if the answer changed the plan.",
+      "items": {
+        "type": "object",
+        "required": ["id", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^A-[0-9]+$" },
+          "sourceAmbiguityId": {
+            "type": ["string", "null"],
+            "pattern": "^Q-[0-9]+$",
+            "description": "The baseline ambiguities[].id this traces back to, if any. Null if this is a new assumption Design Agent introduced itself (e.g. about locator stability, test data, or something the baseline never raised)."
+          },
+          "text": {
+            "type": "string",
+            "description": "What was assumed and why — plain enough for Coverage Agent to surface to a human without re-deriving context."
+          }
+        }
+      }
+    },
+    "outOfScope": {
+      "type": "array",
+      "description": "Requirements or ACs deliberately not covered by any scenario, with reasons. Every AC marked testable: false in the baseline belongs here, as does anything else deliberately excluded.",
+      "items": {
+        "type": "object",
+        "required": ["refType", "refId", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "refType": { "type": "string", "enum": ["AC", "REQ", "EC"] },
+          "refId": { "type": "string", "pattern": "^(AC|REQ|EC)-[0-9]+$" },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}
