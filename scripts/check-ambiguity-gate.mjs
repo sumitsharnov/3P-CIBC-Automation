@@ -85,7 +85,7 @@ function main() {
   }
   console.error(
     `Do NOT proceed to Design Agent. Answer these in ${path.relative(process.cwd(), answersPath)} ` +
-    `(create it if it doesn't exist, per .claude/agents/schemas/research-answers.schema.json) and re-run this gate.`
+    `(create it if it doesn't exist, per pipeline/schemas/research-answers.schema.json) and re-run this gate.`
   );
   process.exit(1);
 }

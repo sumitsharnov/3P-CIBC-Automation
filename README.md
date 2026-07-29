@@ -10,7 +10,9 @@ lives alongside this in the repo root.
 
 ```
 .claude/agents/
-  research-agent.md                    Agent 1: ticket -> requirements baseline
+  research-agent.md                    Agent 1: ticket -> requirements baseline (must live here for Claude Code to discover it)
+
+pipeline/
   schemas/
     research-output.schema.json        Contract for *.requirements.json
     research-answers.schema.json       Contract for *.answers.json
@@ -62,7 +64,7 @@ node scripts/check-ambiguity-gate.mjs agent-output/ResearchAgent-Output/<TICKET>
   prints each one's ID, question, and impact. **Do not proceed.**
 
 If a matching `<TICKET>.answers.json` exists (see schema at
-`.claude/agents/schemas/research-answers.schema.json`), any blocking
+`pipeline/schemas/research-answers.schema.json`), any blocking
 ambiguity whose ID appears in `answers[].questionId` counts as resolved. A
 human writes this file after reading the questions and deciding; there is no
 automated way to satisfy the gate.

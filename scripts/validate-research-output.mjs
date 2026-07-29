@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Validates Research Agent output files against their JSON schemas:
-//   *.requirements.json -> .claude/agents/schemas/research-output.schema.json
-//   *.answers.json      -> .claude/agents/schemas/research-answers.schema.json
+//   *.requirements.json -> pipeline/schemas/research-output.schema.json
+//   *.answers.json      -> pipeline/schemas/research-answers.schema.json
 // Hard-fails (non-zero exit) on any violation, so the orchestrator (and CI,
 // later) can refuse to hand a bad baseline or a malformed answers file
 // downstream.
@@ -27,7 +27,7 @@ import addFormats from 'ajv-formats';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-const SCHEMAS_DIR = path.join(REPO_ROOT, '.claude', 'agents', 'schemas');
+const SCHEMAS_DIR = path.join(REPO_ROOT, 'pipeline', 'schemas');
 const OUTPUT_SCHEMA_PATH = path.join(SCHEMAS_DIR, 'research-output.schema.json');
 const ANSWERS_SCHEMA_PATH = path.join(SCHEMAS_DIR, 'research-answers.schema.json');
 const DEFAULT_OUTPUT_DIR = path.join(REPO_ROOT, 'agent-output', 'ResearchAgent-Output');
