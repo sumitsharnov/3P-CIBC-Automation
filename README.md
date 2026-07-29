@@ -16,11 +16,23 @@ via `playwright-bdd` — stakeholders can still read scenarios in plain
 Given/When/Then, and Research Agent already emits acceptance criteria in that
 shape.
 
+This repo is also a local Claude Code **plugin** (`.claude-plugin/plugin.json`
++ `.claude-plugin/marketplace.json`), which is how agent definitions live in a
+top-level `agents/` folder instead of the more common `.claude/agents/`
+project convention. To use it in a fresh Claude Code install: `/plugin` →
+Marketplaces → Add → point it at this repo's absolute path → install
+`bank-qa-automation-pipeline` → restart Claude Code. Agents then register
+under a namespaced type, e.g. `bank-qa-automation-pipeline:research-agent`.
+
 ## Layout
 
 ```
-.claude/agents/
-  research-agent.md                    Agent 1: ticket -> requirements baseline (must live here for Claude Code to discover it)
+.claude-plugin/
+  plugin.json                          Plugin manifest (name, version, description)
+  marketplace.json                     Local marketplace catalog listing this plugin (source: ".")
+
+agents/
+  research-agent.md                    Agent 1: ticket -> requirements baseline (discovered via the plugin, not .claude/agents/)
 
 pipeline/
   schemas/

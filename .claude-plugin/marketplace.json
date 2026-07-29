@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "bank-qa-automation-pipeline",
+  "description": "Local marketplace for the CIBC AI MVP agent pipeline (bank-app test automation demo).",
+  "owner": {
+    "name": "Sumit Kumar1"
+  },
+  "plugins": [
+    {
+      "name": "bank-qa-automation-pipeline",
+      "description": "Research Agent (ticket -> requirements baseline) and the agents that follow it, for the bank-app test automation demo.",
+      "author": {
+        "name": "Sumit Kumar1"
+      },
+      "source": "."
+    }
+  ]
+}
