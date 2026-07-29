@@ -1,10 +1,20 @@
-# Bank QA Automation — Agent Pipeline Tooling
+# Bank QA Automation
 
-This repo hosts the CIBC AI MVP agent pipeline: Claude Code subagents that
-turn a Jira ticket into validated Java test automation for the `bank-app`
-demo (a separate repo). This README documents the pipeline's validation and
-gating tooling — the Java/Selenium/Cucumber/TestNG test framework itself
-lives alongside this in the repo root.
+This repo hosts two things for the CIBC AI MVP prototype:
+
+1. The **agent pipeline tooling** — Claude Code subagents that turn a Jira
+   ticket into a validated test plan for the `bank-app` demo (a separate
+   repo), plus the schemas/scripts that keep handoffs between agents
+   reliable.
+2. The **test automation framework** itself — Playwright + TypeScript +
+   `playwright-bdd`, testing `bank-app` end to end.
+
+Stack decision (Helix vision doc, *Project Vision: CIBC AI MVP*, Revision 4):
+Playwright replaces Selenium entirely, both as the test framework and as the
+agent's tool for live-app inspection. Gherkin `.feature` files are retained
+via `playwright-bdd` — stakeholders can still read scenarios in plain
+Given/When/Then, and Research Agent already emits acceptance criteria in that
+shape.
 
 ## Layout
 
@@ -28,11 +38,82 @@ agent-output/
 scripts/
   validate-research-output.mjs         Schema validation for *.requirements.json and *.answers.json
   check-ambiguity-gate.mjs             The blocking-ambiguity gate (see below)
+  run-e2e-with-report.mjs              Runs the e2e suite, then always generates the report (see below)
+
+features/                              Gherkin .feature files, tagged (@login, @login-broken, ...)
+steps/                                 Step definitions: thin, call page objects + assert, no raw Playwright calls
+pages/                                 One Page Object per screen, extends BasePage
+fixtures/pages.ts                      Playwright fixtures wiring page objects into tests
+reporting/                             Parses Playwright's JSON reporter output -> custom HTML/CSS dashboard
+playwright.config.ts                   Projects, baseURL, reporters, trace/screenshot settings
 ```
 
 Each later agent (Design, Code, Test, Smoke Test, Coverage) gets its own
 `agent-output/<AgentName>-Output/` folder following the same convention as it's
 built.
+
+## Test framework — Playwright + TypeScript + playwright-bdd
+
+### Running the suite
+
+```
+npm run test:e2e:report
+```
+
+This generates the BDD spec files (`bddgen`), runs the suite against
+`baseURL` (default `http://localhost:5173` — start `bank-app`'s own dev
+server first, e.g. `npm run dev` in that repo), then **always** regenerates
+the custom HTML report at `test-results/qa-report/index.html`, whether tests
+passed or failed. A failing run is exactly when the report is most useful, so
+report generation isn't skipped on test failure.
+
+Other scripts:
+- `npm run bddgen` — just (re)generate `.features-gen/` from the `.feature` files, no test run.
+- `npm run test:e2e` — `bddgen` + `playwright test`, no report.
+
+### Why a custom report, not Playwright's built-in HTML reporter
+
+Same reasoning as the discarded Java framework's report: we want a
+stakeholder-facing, single-file dashboard with a plain-English diagnosis per
+scenario (what it verified, or a classified reason for failure — timeout,
+assertion mismatch, strict-mode locator collision, etc.), not just a
+pass/fail list. `playwright.config.ts` configures the `json` reporter
+(`test-results/results.json`); `reporting/generate-report.mjs` parses that
+and renders the dashboard, embedding failure screenshots as base64 so the
+report is a single self-contained HTML file.
+
+### Playwright-bdd version note
+
+`playwright-bdd` v9 requires an explicit generation step (`bddgen`) before
+`playwright test` — unlike some older major versions, `defineBddConfig()` in
+`playwright.config.ts` no longer generates spec files as a side effect of
+loading the config. `npm run test:e2e` and `test:e2e:report` already do this
+for you; if invoking `playwright test` directly, run `npx bddgen` first or
+you'll get `Error: No tests found`.
+
+Also note: any file that a step-definition file imports its custom `test`
+fixture from (here, `fixtures/pages.ts`) must be included in
+`defineBddConfig`'s `steps` glob, not just the step files themselves —
+otherwise `bddgen` can't statically determine which fixture-extended `test`
+instance is in use and fails with *"Can't guess test instance"*.
+
+### Playwright conventions used here (don't port Selenium habits)
+
+- No explicit waits or `sleep` — Playwright auto-waits on locators. Anything
+  that needs waiting for is expressed as a locator assertion
+  (`await expect(locator).toBeVisible()`), not a manual wait.
+- Semantic locators over CSS/XPath: `getByLabel`, `getByRole`. The app's
+  error messages use `role="alert"`, which is why `LoginPage`/`LoginBrokenPage`
+  select errors via `getByRole('alert')` rather than a CSS class.
+  `bank-app`'s labels are properly associated via `<label htmlFor>`/`id`, so
+  `getByLabel` works directly against the real markup.
+  Test framework depends on this convention — if a form label ever loses its
+  `htmlFor`/`id` association, tests will fail to find the field, not
+  silently pass with the wrong element.
+- Screenshots for the custom report come from Playwright's own
+  `screenshot: 'only-on-failure'` config (an attachment on the JSON result),
+  not a custom after-step hook — Playwright already captures this natively;
+  `generate-report.mjs` just reads the attachment file and embeds it.
 
 ## The blocking-ambiguity gate
 

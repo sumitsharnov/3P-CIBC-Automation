@@ -2,17 +2,24 @@
   "name": "bank-qa-automation-pipeline",
   "private": true,
   "version": "1.0.0",
-  "description": "Validation tooling for the CIBC AI MVP agent pipeline (Java/Maven test framework lives in this repo's root; this package.json is only for the JS-based schema validation step).",
+  "description": "CIBC AI MVP: Research Agent pipeline tooling plus the Playwright + TypeScript + playwright-bdd test automation framework for the bank-app demo.",
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
     "validate:research-output": "node scripts/validate-research-output.mjs",
-    "check:ambiguity-gate": "node scripts/check-ambiguity-gate.mjs"
+    "check:ambiguity-gate": "node scripts/check-ambiguity-gate.mjs",
+    "bddgen": "bddgen",
+    "test:e2e": "npm run bddgen && playwright test",
+    "test:e2e:report": "node scripts/run-e2e-with-report.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.10.0",
     "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "playwright-bdd": "^9.2.0",
+    "typescript": "^5.7.2"
   }
 }
