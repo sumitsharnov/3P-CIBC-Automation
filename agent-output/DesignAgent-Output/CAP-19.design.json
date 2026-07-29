@@ -1,0 +1,371 @@
+{
+  "ticket": {
+    "id": "CAP-19",
+    "requirementsFile": "agent-output/ResearchAgent-Output/CAP-19.requirements.json"
+  },
+  "scenarios": [
+    {
+      "id": "SC-1",
+      "title": "Dashboard shows total balance, net cash flow, and investment gain/loss stat tiles from seeded data",
+      "tags": ["@dashboard", "@stat-tiles", "@smoke"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data",
+        "Then the 'Total balance' tile shows the sum of all account balances formatted as currency, with the sub-caption 'Across all accounts'",
+        "And the 'Net cash flow' tile shows (total money in - total money out) formatted as currency, with a delta line showing money in and money out amounts",
+        "And the net cash flow delta is styled as positive (up-arrow, positive color) because the seeded net flow is greater than zero",
+        "And the 'Investment gain/loss' tile shows (total market value - total cost basis) as a signed currency amount, with a delta line showing the signed gain/loss percentage",
+        "And the investment gain/loss delta is styled as positive because the seeded portfolio value exceeds cost basis"
+      ],
+      "coversAC": ["AC-1"],
+      "coversREQ": ["REQ-1", "REQ-2", "REQ-3"],
+      "coversEC": [],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/BasePage.ts", "kind": "page-object", "why": "DashboardPage extends BasePage for the shared open()/currentUrl() navigation helpers, same pattern as LoginPage/AccountsPage." },
+        { "path": "fixtures/pages.ts", "kind": "fixture", "why": "Extend the existing PageFixtures type/test.extend() block to add a dashboardPage fixture alongside loginPage/accountsPage, following the established one-fixture-per-page-object convention." }
+      ],
+      "newArtifacts": [
+        { "kind": "page-object", "proposedPath": "pages/DashboardPage.ts", "purpose": "Encapsulates all Dashboard locators/assertions: since StatTile/CreditMeter/chart components have no data-testid attributes, methods must locate stat tiles by finding the container whose label paragraph has the exact tile text (e.g. 'Total balance', 'Net cash flow', 'Investment gain/loss') then read sibling value/delta paragraphs within that same container; expose readStatTile(label), readCreditMeter(), scope chip helpers, cash-flow/category/portfolio/performance chart readers, and a waitForLoaded()/expectLoadingState() pair for REQ-12." },
+        { "kind": "feature-file", "proposedPath": "features/dashboard.feature", "purpose": "Houses all Dashboard scenarios (SC-1 through SC-16) tagged @dashboard, with sub-tags per chart/tile area so each scenario remains independently runnable." },
+        { "kind": "step-definition", "proposedPath": "steps/dashboard.steps.ts", "purpose": "Step definitions backing dashboard.feature, delegating all page interaction/assertion to DashboardPage." },
+        { "kind": "fixture", "proposedPath": "fixtures/dashboardData.ts", "purpose": "Seeds/overrides the app's persisted state (localStorage key 'app-bank-state', version 2, shape {accounts, transactions, holdings, payees} as read by src/api/accountsApi.js loadState()) via page.addInitScript before navigation, and resets it afterward. Needed because the default seed data (src/data.js) cannot produce the EC-1/EC-3/EC-4/EC-5/EC-6/EC-7 data states on its own — see A-5/A-6." }
+      ]
+    },
+    {
+      "id": "SC-2",
+      "title": "Credit utilization tile renders for a customer with a Credit Card account",
+      "tags": ["@dashboard", "@stat-tiles", "@credit-meter"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data (which includes the 'Aventura Visa' Credit Card account)",
+        "Then a 'Credit utilization' tile is displayed with a meter (role=meter, aria-label 'Credit utilization') showing the percentage of credit limit used",
+        "And the tile shows a caption 'X used of Y' where X is the amount used (max(0, -balance)) and Y is the credit limit, both formatted as CAD currency",
+        "And the meter's progress bar is colored according to severity (brand color below 70%, amber/chart-4 at 70-89%, negative/red at 90%+) matching the seeded ~24% utilization"
+      ],
+      "coversAC": ["AC-1"],
+      "coversREQ": ["REQ-4"],
+      "coversEC": [],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses the readCreditMeter() locator/assertion helper created for SC-1's page object." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-3",
+      "title": "No Credit utilization tile is shown when the customer has no Credit Card account",
+      "tags": ["@dashboard", "@stat-tiles", "@credit-meter", "@negative"],
+      "steps": [
+        "Given the seeded accounts data is overridden so no account has type 'Credit Card'",
+        "When I land on the dashboard",
+        "Then no element with role=meter / aria-label 'Credit utilization' is rendered",
+        "And the other three stat tiles (Total balance, Net cash flow, Investment gain/loss) still render normally"
+      ],
+      "coversAC": ["AC-1"],
+      "coversREQ": ["REQ-4"],
+      "coversEC": ["EC-7"],
+      "type": "negative",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses readCreditMeter()/readStatTile() to assert absence vs. presence." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-4",
+      "title": "Credit utilization caps display at 100% and switches to highest-severity color when balance meets or exceeds the credit limit",
+      "tags": ["@dashboard", "@stat-tiles", "@credit-meter", "@boundary"],
+      "steps": [
+        "Given the seeded Credit Card account's balance is overridden so used amount equals or exceeds its credit limit (100%+ utilization)",
+        "When I land on the dashboard",
+        "Then the Credit utilization tile displays exactly 100% (never over), aria-valuenow is capped at 100",
+        "And the progress bar is colored with the 90%+ severity color band",
+        "And the 'used of limit' caption still shows the true (uncapped) used amount versus the limit"
+      ],
+      "coversAC": ["AC-1"],
+      "coversREQ": ["REQ-4"],
+      "coversEC": ["EC-4"],
+      "type": "boundary",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses readCreditMeter()." },
+        { "path": "fixtures/dashboardData.ts", "kind": "fixture", "why": "Seeds a Credit Card account balance at/over its limit, a state the default seed data (24% utilization) never reaches." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-5",
+      "title": "Net cash flow and investment gain/loss at exactly zero are styled as positive, not negative",
+      "tags": ["@dashboard", "@stat-tiles", "@boundary"],
+      "steps": [
+        "Given the seeded transactions are overridden so total money in equals total money out (net cash flow = 0)",
+        "And the seeded holdings are overridden so total market value equals total cost basis (investment gain/loss = 0)",
+        "When I land on the dashboard",
+        "Then the Net cash flow tile's delta is styled positive (up-arrow, positive color), not negative, since the component's styling check is netFlow >= 0",
+        "And the Investment gain/loss tile's delta is styled positive and shows '+0.0%' / '+$0.00', not negative, since the check is investGain >= 0"
+      ],
+      "coversAC": ["AC-1"],
+      "coversREQ": ["REQ-2", "REQ-3"],
+      "coversEC": ["EC-5"],
+      "type": "boundary",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses readStatTile() including delta styling assertions." },
+        { "path": "fixtures/dashboardData.ts", "kind": "fixture", "why": "Seeds transaction/holding data that nets to exactly zero, a state the default seed data doesn't reach." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-6",
+      "title": "Cash flow chart plots money in/out per date with a totals summary line, scoped to All accounts",
+      "tags": ["@dashboard", "@cash-flow"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data, scope set to 'All accounts' (the default)",
+        "Then the cash flow chart renders one bar per distinct transaction date, bars above the baseline for money-in dates and below for money-out dates (bar role=img, aria-label '<date>: <signed amount>')",
+        "And a summary line below the chart shows total money in (sum of positive amounts) and total money out (sum of negative amounts, shown as an absolute value) for the currently scoped transactions"
+      ],
+      "coversAC": ["AC-2"],
+      "coversREQ": ["REQ-5", "REQ-6"],
+      "coversEC": [],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses a readCashFlowChart() helper reading bar aria-labels and the money-in/out summary line text." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-7",
+      "title": "Cash flow chart shows an empty-state message when the selected account scope has zero transactions",
+      "tags": ["@dashboard", "@cash-flow", "@negative"],
+      "steps": [
+        "Given the seeded accounts/transactions are overridden to add an account that has zero transactions",
+        "When I land on the dashboard and select that account's scope chip",
+        "Then the cash flow chart area shows the exact text 'No transactions in this view.' instead of any chart SVG",
+        "And no bars or summary totals line are rendered"
+      ],
+      "coversAC": ["AC-2"],
+      "coversREQ": ["REQ-5"],
+      "coversEC": ["EC-1"],
+      "type": "negative",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses readCashFlowChart()/scope chip selection helper." },
+        { "path": "fixtures/dashboardData.ts", "kind": "fixture", "why": "Seeds an account with zero associated transactions; no seeded account in src/data.js has zero transactions." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-8",
+      "title": "Account scope chips filter the cash flow and spending charts only — stat tiles remain computed across all accounts",
+      "tags": ["@dashboard", "@scope-filter"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data (3 accounts: Everyday Chequing, High-Interest Savings, Aventura Visa)",
+        "When I select the 'Everyday Chequing' scope chip (via the role=group aria-label 'Filter by account')",
+        "Then the cash flow chart and spending-by-category chart update to reflect only Everyday Chequing's transactions",
+        "But the Total balance, Investment gain/loss, and Credit utilization tiles remain unchanged, still reflecting all accounts",
+        "And selecting 'All accounts' again restores the unfiltered cash flow / spending views"
+      ],
+      "coversAC": [],
+      "coversREQ": ["REQ-7"],
+      "coversEC": ["EC-8"],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses scope-chip and stat-tile/chart reading helpers to compare before/after filtering." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-9",
+      "title": "Spending by category excludes Income/Transfer/Payment, sorts by amount descending, and shows percent of total",
+      "tags": ["@dashboard", "@category-spend"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data, scope 'All accounts'",
+        "Then the spending-by-category list contains only outgoing (negative-amount) transactions' categories, excluding any category named Income, Transfer, or Payment",
+        "And the categories are ordered by total amount descending",
+        "And each row's percentage-of-total text (e.g. 'X% of total spending') equals that category's amount divided by the sum of all displayed categories' amounts"
+      ],
+      "coversAC": ["AC-3"],
+      "coversREQ": ["REQ-8"],
+      "coversEC": [],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses a readCategorySpend() helper that reads each list item's category name, amount, and percentage text; the percentage text has opacity:0 by default (only opacity:100 on hover/focus) but remains present in the DOM, so it is readable via text content without needing to simulate a real hover." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-10",
+      "title": "Spending by category shows an empty-state message when the scoped transactions have no spendable (non-excluded) categories",
+      "tags": ["@dashboard", "@category-spend", "@negative"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data",
+        "When I select the 'High-Interest Savings' scope chip (whose seeded transactions are all category Income or Transfer)",
+        "Then the spending-by-category area shows the exact text 'No spending in this view.' instead of any list",
+        "And this is distinct from the zero-transaction empty state (EC-1) shown by the cash flow chart, since Savings does have transactions — just none in a spendable category"
+      ],
+      "coversAC": ["AC-3"],
+      "coversREQ": ["REQ-8"],
+      "coversEC": ["EC-2"],
+      "type": "negative",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses scope chip selection and readCategorySpend() empty-state check. Uses the existing seeded 'High-Interest Savings' account (all Income/Transfer transactions) — no custom data seeding needed for this one." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-11",
+      "title": "Portfolio allocation donut shows each holding's percentage of total market value with a matching legend",
+      "tags": ["@dashboard", "@portfolio"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data (4 holdings)",
+        "Then the donut renders one segment per holding (role=img, aria-label '<name>: <value>, <pct>%') whose percentage equals that holding's value divided by total market value across all holdings",
+        "And the center label shows 'Market value' with the total formatted as currency",
+        "And the legend lists each holding's name and value, matching the segments"
+      ],
+      "coversAC": ["AC-4"],
+      "coversREQ": ["REQ-9"],
+      "coversEC": [],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses a readPortfolioDonut() helper reading segment aria-labels and legend rows." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-12",
+      "title": "Portfolio donut degrades gracefully when total holdings market value is zero",
+      "tags": ["@dashboard", "@portfolio", "@boundary"],
+      "steps": [
+        "Given the seeded holdings are overridden so every holding's value is 0 (total market value = 0)",
+        "When I land on the dashboard",
+        "Then every donut segment shows 0% (not NaN% or Infinity%), guarded by the total > 0 fallback",
+        "And the center label shows 'Market value' with '$0.00'",
+        "And the legend still lists each holding by name with $0.00 value"
+      ],
+      "coversAC": ["AC-4"],
+      "coversREQ": ["REQ-9"],
+      "coversEC": ["EC-3"],
+      "type": "boundary",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses readPortfolioDonut()." },
+        { "path": "fixtures/dashboardData.ts", "kind": "fixture", "why": "Seeds holdings whose values all sum to zero, a state the default seed portfolio (4 positive-value holdings) never reaches." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-13",
+      "title": "Investment performance dumbbell shows cost basis vs. current value and gain/loss percentage per holding",
+      "tags": ["@dashboard", "@performance"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data",
+        "Then the performance chart renders one row per holding (role=img, aria-label '<name>: cost basis <costBasis>, current value <value>, gain/loss <amount>')",
+        "And each row's dots are positioned at the cost-basis and current-value x-coordinates, connected by a line colored by gain (positive) or loss (negative)",
+        "And each row's right-hand label shows the signed gain/loss percentage, matching (value - costBasis) / costBasis * 100"
+      ],
+      "coversAC": ["AC-4"],
+      "coversREQ": ["REQ-10"],
+      "coversEC": [],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses a readPerformanceDumbbell() helper reading per-row aria-labels and gain% text." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-14",
+      "title": "A holding with zero cost basis shows a guarded 0% gain instead of NaN/Infinity, on both the stat tile and the performance chart",
+      "tags": ["@dashboard", "@performance", "@stat-tiles", "@boundary"],
+      "steps": [
+        "Given the seeded holdings are overridden so one holding has costBasis = 0 (e.g. a gifted/transferred position) while retaining a nonzero market value",
+        "When I land on the dashboard",
+        "Then that holding's row in the performance chart shows gain/loss percentage of 0% (not NaN% or Infinity%), guarded by the costBasis > 0 fallback",
+        "And the portfolio-level Investment gain/loss stat tile's percentage calculation also remains a finite number, unaffected by that single zero-cost-basis holding"
+      ],
+      "coversAC": ["AC-4"],
+      "coversREQ": ["REQ-3", "REQ-10"],
+      "coversEC": ["EC-6"],
+      "type": "boundary",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses readPerformanceDumbbell() and readStatTile()." },
+        { "path": "fixtures/dashboardData.ts", "kind": "fixture", "why": "Seeds a holding with costBasis 0, a state no seeded holding in src/data.js has (all four seeded holdings have positive cost bases)." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-15",
+      "title": "All dashboard figures reflect the customer's seeded demo dataset values, not a live feed",
+      "tags": ["@dashboard", "@data-source"],
+      "steps": [
+        "Given I am signed in and land on the dashboard with the default seeded demo data",
+        "Then the Total balance tile's value equals the known sum of the seeded account balances",
+        "And the cash flow, spending-by-category, portfolio, and performance figures each match values computable directly from the known seeded transactions/holdings arrays",
+        "And these values are stable across a page reload with no change to the seeded dataset, consistent with the app sourcing data from its local seeded/mocked accountsApi rather than any live/external feed"
+      ],
+      "coversAC": [],
+      "coversREQ": ["REQ-11"],
+      "coversEC": [],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses the same stat-tile/chart readers used elsewhere, just asserting against known constant values instead of general shape." }
+      ],
+      "newArtifacts": []
+    },
+    {
+      "id": "SC-16",
+      "title": "Dashboard shows a loading state and withholds stat tiles/charts until account, transaction, and holdings data has finished loading",
+      "tags": ["@dashboard", "@loading"],
+      "steps": [
+        "Given I navigate to the dashboard immediately after sign-on",
+        "Then, before data has finished loading, the page shows the loading text 'Loading your accounts…' and none of the stat tiles or charts are present",
+        "When the simulated data fetch resolves",
+        "Then the loading text disappears and the stat tiles and all four chart sections render with the seeded data"
+      ],
+      "coversAC": [],
+      "coversREQ": ["REQ-12"],
+      "coversEC": [],
+      "type": "happy-path",
+      "reuse": [
+        { "path": "pages/DashboardPage.ts", "kind": "page-object", "why": "Reuses expectLoadingState()/waitForLoaded() helpers built for this scenario, plus readStatTile() to confirm tiles are absent pre-load and present post-load." }
+      ],
+      "newArtifacts": []
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A-1",
+      "sourceAmbiguityId": "Q-1",
+      "text": "Chose to verify REQ-11 ('not a live feed') by asserting displayed figures match values computable from the known seeded dataset and remain stable across reloads (SC-15), rather than adding network-interception assertions (e.g. asserting zero external HTTP requests). The app's accountsApi module is a client-side/localStorage-backed seam by design (confirmed in src/api/accountsApi.js), so asserting 'no live feed' at the network layer would test an implementation detail the ticket never asked for."
+    },
+    {
+      "id": "A-2",
+      "sourceAmbiguityId": "Q-2",
+      "text": "Treated all four implemented stat tiles (Total balance, Net cash flow, Investment gain/loss, Credit utilization) as in-scope contractual behavior, not just the 'total balance' example named in AC-1, since the requirements baseline already promotes them to REQ-1 through REQ-4."
+    },
+    {
+      "id": "A-3",
+      "sourceAmbiguityId": "Q-3",
+      "text": "Tested PortfolioDonut (REQ-9) and PerformanceDumbbell (REQ-10) as two independently verifiable scenario groups (SC-11/12 vs. SC-13/14) rather than one combined scenario, since they are separate components with separate requirements, even though both trace to AC-4. A future change to only one chart should be attributable to a specific failing scenario, not an ambiguous shared one."
+    },
+    {
+      "id": "A-4",
+      "sourceAmbiguityId": "Q-4",
+      "text": "Treated the account-scope filter chips as in-scope test surface (SC-6, SC-8, SC-10) since the requirements baseline already formalized them as REQ-7, even though the original ticket text never mentioned them."
+    },
+    {
+      "id": "A-5",
+      "sourceAmbiguityId": null,
+      "text": "The default seeded dataset (src/data.js) cannot produce several required edge-case states on its own: no account with zero transactions (EC-1), no zero-total-market-value holdings set (EC-3), no Credit Card account at/over its limit (EC-4), no zero-cost-basis holding (EC-6), and no account list without a Credit Card account (EC-7). Scenarios exercising these (SC-3, SC-4, SC-7, SC-12, SC-14) will seed a custom state directly via a fixture that writes the app's known localStorage schema (key 'app-bank-state', version 2, shape read by src/api/accountsApi.js loadState()) before navigation, rather than relying on in-app user actions to reach these states."
+    },
+    {
+      "id": "A-6",
+      "sourceAmbiguityId": null,
+      "text": "EC-5 (net cash flow or investment gain/loss exactly zero) likewise cannot be reached with the default seeded transactions/holdings, so SC-5 uses the same localStorage-seeding fixture to construct transaction and holding data that nets to precisely zero."
+    },
+    {
+      "id": "A-7",
+      "sourceAmbiguityId": null,
+      "text": "The scope chip buttons (ScopeChip in Dashboard.jsx) expose 'active' state only via a CSS class toggle (border-brand/bg-brand-tint/text-brand), not an aria-pressed or aria-current attribute. SC-8's active-chip assertion will need to check computed style/class rather than an accessible state attribute; flagging this in case Code Agent needs a more resilient locator strategy than role-based queries alone."
+    },
+    {
+      "id": "A-8",
+      "sourceAmbiguityId": null,
+      "text": "SC-16's loading-state check is inherently timing-dependent: AccountsContext resolves after a fixed SIMULATED_LATENCY_MS (250ms) in src/api/accountsApi.js. The scenario asserts the loading text appears immediately after navigation and disappears once that fixed delay elapses; if that constant changes, the scenario's implicit timing assumption should be revisited."
+    }
+  ],
+  "outOfScope": []
+}
