@@ -1,0 +1,11 @@
+{
+  "ticket": "CAP-19",
+  "answers": [
+    {
+      "questionId": "Q-5",
+      "answer": "Yes — this ticket is meant to close the coverage gap. Write new automated tests for REQ-1 through REQ-12 and the edge cases identified (EC-1 through EC-8). The 'documentation' label reflects that the Financial Overview Dashboard feature itself is already built and stable, not that no new test work is wanted — the reason this ticket exists in the pipeline at all is to add missing automated coverage for an existing, currently under-tested feature. Design Agent should treat the full requirements baseline as in scope for new test authoring, not just a documentation pass.",
+      "answeredBy": "Sumit Kumar1",
+      "answeredAt": "2026-07-29"
+    }
+  ]
+}
