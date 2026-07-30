@@ -143,6 +143,19 @@ needed," that fixture belongs in `newArtifacts[]` as a concrete entry (kind
 prose. Code Agent reads `newArtifacts[]` to know what to build; it does not
 re-read every assumption looking for buried infrastructure requirements.
 
+**Every `newArtifacts[]` entry needs a `mode`: `create` or `extend`.** Check
+with `Glob`/`Read` whether the path already exists before writing the entry
+— don't guess. `create` means the path doesn't exist yet. `extend` means it
+already exists and your plan adds to it without discarding what's there —
+this is the common case for `.feature` files: `features/login.feature`
+already has 3 scenarios, and a plan adding 10 more must set `mode: extend`
+on that entry, not `create`. Getting this wrong isn't cosmetic — a `create`
+entry for a file that already has content is exactly the kind of ambiguity
+that gets a real file overwritten by Code Agent. If you're unsure whether an
+existing file counts as "reuse as-is" or "extend with more," ask: does this
+plan need to add to it? If yes, it's `newArtifacts[]` with `mode: extend`,
+not `reuse[]` — `reuse[]` is for artifacts your plan consumes unchanged.
+
 ## Requirements come from the baseline, not from you
 
 Research Agent already did the deep source analysis and recorded it in

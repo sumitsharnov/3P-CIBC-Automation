@@ -229,10 +229,10 @@ export function renderDesignMarkdown(plan, baseline, hasAnswersFile, sourceJsonN
   if ((plan.newArtifacts ?? []).length === 0) {
     lines.push('_None — this plan needs nothing beyond what already exists._');
   } else {
-    lines.push('| Path | Kind | Purpose |');
-    lines.push('|------|------|---------|');
+    lines.push('| Path | Kind | Mode | Purpose |');
+    lines.push('|------|------|------|---------|');
     for (const a of plan.newArtifacts) {
-      lines.push(`| \`${a.path}\` | ${a.kind} | ${esc(a.purpose)} |`);
+      lines.push(`| \`${a.path}\` | ${a.kind} | ${a.mode} | ${esc(a.purpose)} |`);
     }
   }
   lines.push('');

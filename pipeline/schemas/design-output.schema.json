@@ -87,15 +87,20 @@
     },
     "newArtifacts": {
       "type": "array",
-      "description": "What Code Agent must create for this plan to be implementable, for the plan as a whole. Includes anything assumptions[] implies is needed (e.g. a seed-data fixture for edge cases the default seed data can't reach) — that need must show up here, not just in assumption prose.",
+      "description": "What Code Agent must write to for this plan to be implementable, for the plan as a whole. Includes anything assumptions[] implies is needed (e.g. a seed-data fixture for edge cases the default seed data can't reach) — that need must show up here, not just in assumption prose. This covers both brand-new files (mode: create) and existing files that must gain new content (mode: extend) — never leave that ambiguous to prose alone.",
       "items": {
         "type": "object",
-        "required": ["kind", "path", "purpose"],
+        "required": ["kind", "path", "purpose", "mode"],
         "additionalProperties": false,
         "properties": {
           "kind": { "type": "string", "enum": ["page-object", "step-definition", "fixture", "feature-file", "helper"] },
-          "path": { "type": "string", "description": "Proposed repo-relative path, following existing conventions, e.g. pages/DashboardPage.ts." },
-          "purpose": { "type": "string" }
+          "path": { "type": "string", "description": "Repo-relative path, following existing conventions, e.g. pages/DashboardPage.ts." },
+          "purpose": { "type": "string" },
+          "mode": {
+            "type": "string",
+            "enum": ["create", "extend"],
+            "description": "create: path does not exist yet, Code Agent writes it from scratch. extend: path already exists (verify with Glob/Read before writing this entry) and must gain new content WITHOUT discarding what's already there — e.g. features/login.feature already has 3 scenarios; a plan adding 10 more must set mode: extend, not create, or Code Agent has no structured signal against overwriting the existing 3."
+          }
         }
       }
     },
