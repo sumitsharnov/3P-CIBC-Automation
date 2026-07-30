@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "design-agent-output.schema.json",
   "title": "Design Agent Output — Test Plan",
-  "description": "The only thing the Design Agent produces. Code Agent consumes this shape, not prose, and owns all file writing — Design Agent plans, it does not write test files. Every requirement from the source requirements.json must appear in some scenario's coversREQ or in outOfScope; every scenario's artifacts[] must resolve to an entry in the plan-wide reuse[]/newArtifacts[] pool. The validator (not just this schema) enforces both, since JSON Schema alone can't check cross-references.",
+  "description": "The only thing the Design Agent produces. Code Agent consumes this shape, not prose, and owns all file writing — Design Agent plans, it does not write test files. Every requirement from the source requirements.json must appear in some scenario's coversREQ or in outOfScope; every scenario's artifacts[] must resolve to an entry in the plan-wide reuse[]/newArtifacts[] pool; if scenarios.length exceeds NFR-001's typical-story threshold (6), performanceNote must be present. The validator (not just this schema) enforces all three, since JSON Schema alone can't check cross-references or conditional requirements like these.",
   "type": "object",
   "required": ["ticket", "scenarios", "reuse", "newArtifacts", "assumptions", "outOfScope"],
   "additionalProperties": false,
@@ -24,7 +24,7 @@
       "description": "One per test scenario. Not 1:1 with ACs — one AC may need multiple scenarios (happy-path + negative), or several related ACs may collapse into one scenario. The coversAC/coversREQ/coversEC arrays are what actually records the mapping.",
       "items": {
         "type": "object",
-        "required": ["id", "title", "tags", "steps", "coversAC", "coversREQ", "coversEC", "type", "artifacts"],
+        "required": ["id", "title", "tags", "steps", "coversAC", "coversREQ", "coversEC", "type", "artifacts", "isolation", "isolationNotes"],
         "additionalProperties": false,
         "properties": {
           "id": { "type": "string", "pattern": "^SC-[0-9]+$" },
@@ -67,6 +67,15 @@
             "type": "array",
             "items": { "type": "string" },
             "description": "Repo-relative paths this scenario depends on — each one MUST match a path appearing in this plan's top-level reuse[] or newArtifacts[] (enforced by the validator, not just this schema). This is how 'every scenario is implementable from reuse+newArtifacts combined' gets checked mechanically instead of just asserted in prose. Rarely empty — almost every scenario touches at least a page object."
+          },
+          "isolation": {
+            "type": "string",
+            "enum": ["parallel-safe", "serial-required"],
+            "description": "parallel-safe: this scenario relies on nothing beyond Playwright's default per-test browser context (fresh localStorage, no shared storageState/persistent context) — the normal case. serial-required: this scenario depends on some resource NOT isolated by a fresh browser context (e.g. a real shared backend, a file the test suite writes outside the browser, execution order relative to another specific scenario) and must not run concurrently with whatever it conflicts with — name the conflict in isolationNotes."
+          },
+          "isolationNotes": {
+            "type": "string",
+            "description": "Required even for parallel-safe scenarios — state the isolation basis explicitly rather than leaving it to an unstated Playwright default (e.g. 'seeds custom state via page.addInitScript scoped to this test's own browser context; no shared storageState is used'). For serial-required, explain what it conflicts with and why."
           }
         }
       }
@@ -100,6 +109,19 @@
             "type": "string",
             "enum": ["create", "extend"],
             "description": "create: path does not exist yet, Code Agent writes it from scratch. extend: path already exists (verify with Glob/Read before writing this entry) and must gain new content WITHOUT discarding what's already there — e.g. features/login.feature already has 3 scenarios; a plan adding 10 more must set mode: extend, not create, or Code Agent has no structured signal against overwriting the existing 3."
+          },
+          "locators": {
+            "type": "array",
+            "description": "Optional. Locator hints Design Agent observed while reading the actual bank-app source for this artifact (only meaningful for kind: page-object) — recorded so Code Agent doesn't have to re-derive from scratch what Design Agent already found. These are HINTS, not commitments: Code Agent still owns the final page object and may choose a different selector if the hint proves unreliable in practice.",
+            "items": {
+              "type": "object",
+              "required": ["element", "selector"],
+              "additionalProperties": false,
+              "properties": {
+                "element": { "type": "string", "description": "What this locates, in plain language, e.g. 'Credit utilization meter'." },
+                "selector": { "type": "string", "description": "The observed selector strategy, e.g. \"getByRole('meter', { name: 'Credit utilization' })\" — Playwright locator syntax or a plain description of the role/aria-label/text found in source." }
+              }
+            }
           }
         }
       }
@@ -138,6 +160,10 @@
           "reason": { "type": "string" }
         }
       }
+    },
+    "performanceNote": {
+      "type": "string",
+      "description": "Required only when scenarios.length exceeds NFR-001's typical-story threshold of 6 scenarios (validator enforces this, not this schema — an optional field can't be conditionally required in a plain schema). NFR-001 defines a tiered pipeline-runtime target: <=15 minutes for a typical story (<=6 scenarios), <=25 minute ceiling for a complex story (7+ scenarios, multi-page flows). If this plan's scenario count crosses that line, say so explicitly here and state the decision: accept the longer run, or recommend splitting the ticket — don't let a plan silently blow the ceiling with no one having decided that's acceptable."
     }
   }
 }

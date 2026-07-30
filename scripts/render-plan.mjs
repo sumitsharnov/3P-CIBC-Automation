@@ -158,7 +158,15 @@ export function renderDesignMarkdown(plan, baseline, hasAnswersFile, sourceJsonN
   } else {
     lines.push(`**Coverage:** could not compute — requirements baseline unreadable.`);
   }
+  const scenarioCount = (plan.scenarios ?? []).length;
+  lines.push(`**Scenario count:** ${scenarioCount}${scenarioCount > 6 ? ' — exceeds NFR-001\'s typical-story threshold (6); see Performance Note below.' : ' (within NFR-001\'s typical-story threshold of 6).'}`);
   lines.push('');
+  if (plan.performanceNote) {
+    lines.push('## Performance Note (NFR-001)');
+    lines.push('');
+    lines.push(esc(plan.performanceNote));
+    lines.push('');
+  }
 
   lines.push('## Assumptions');
   lines.push('');
@@ -185,11 +193,12 @@ export function renderDesignMarkdown(plan, baseline, hasAnswersFile, sourceJsonN
 
   lines.push('## Scenarios');
   lines.push('');
-  lines.push('| ID | Title | Type | Tags | Covers AC | Covers REQ | Covers EC |');
-  lines.push('|----|-------|------|------|-----------|------------|-----------|');
+  lines.push('| ID | Title | Type | Isolation | Tags | Covers AC | Covers REQ | Covers EC |');
+  lines.push('|----|-------|------|-----------|------|-----------|------------|-----------|');
   for (const s of plan.scenarios ?? []) {
+    const isolationTag = s.isolation === 'serial-required' ? '⚠️ serial-required' : 'parallel-safe';
     lines.push(
-      `| ${s.id} | ${esc(s.title)} | ${s.type} | ${s.tags.join(' ')} | ${s.coversAC.join(', ') || '—'} | ${s.coversREQ.join(', ') || '—'} | ${s.coversEC.join(', ') || '—'} |`
+      `| ${s.id} | ${esc(s.title)} | ${s.type} | ${isolationTag} | ${s.tags.join(' ')} | ${s.coversAC.join(', ') || '—'} | ${s.coversREQ.join(', ') || '—'} | ${s.coversEC.join(', ') || '—'} |`
     );
   }
   lines.push('');
@@ -199,12 +208,16 @@ export function renderDesignMarkdown(plan, baseline, hasAnswersFile, sourceJsonN
   for (const s of plan.scenarios ?? []) {
     lines.push(`### ${s.id} — ${esc(s.title)}`);
     lines.push('');
-    lines.push(`_Type: ${s.type} · Tags: ${s.tags.join(' ')}_`);
+    lines.push(`_Type: ${s.type} · Tags: ${s.tags.join(' ')} · Isolation: ${s.isolation}_`);
     lines.push('');
     for (const step of s.steps) {
       lines.push(`- ${esc(step)}`);
     }
     lines.push('');
+    if (s.isolationNotes) {
+      lines.push(`**Isolation basis:** ${esc(s.isolationNotes)}`);
+      lines.push('');
+    }
     if (s.artifacts.length > 0) {
       lines.push(`**Artifacts used:** ${s.artifacts.map((p) => `\`${p}\``).join(', ')}`);
       lines.push('');
@@ -233,6 +246,18 @@ export function renderDesignMarkdown(plan, baseline, hasAnswersFile, sourceJsonN
     lines.push('|------|------|------|---------|');
     for (const a of plan.newArtifacts) {
       lines.push(`| \`${a.path}\` | ${a.kind} | ${a.mode} | ${esc(a.purpose)} |`);
+    }
+    lines.push('');
+    const withLocators = plan.newArtifacts.filter((a) => (a.locators ?? []).length > 0);
+    if (withLocators.length > 0) {
+      lines.push('**Locator hints** (observed while reading source — hints for Code Agent, not commitments):');
+      lines.push('');
+      for (const a of withLocators) {
+        lines.push(`- \`${a.path}\``);
+        for (const loc of a.locators) {
+          lines.push(`  - ${esc(loc.element)}: \`${loc.selector}\``);
+        }
+      }
     }
   }
   lines.push('');

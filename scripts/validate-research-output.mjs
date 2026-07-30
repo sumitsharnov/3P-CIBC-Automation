@@ -21,7 +21,7 @@
 // --only exists so the two npm scripts actually differ instead of both being
 // the same full sweep under different names.
 //
-// Design-plan completeness checks (two axes, neither expressible in JSON
+// Design-plan completeness checks (three axes, none expressible in JSON
 // Schema alone):
 //   1. Every requirements[].id in the baseline (<ticket>.requirementsFile)
 //      must appear in some scenario's coversREQ or in outOfScope with
@@ -31,6 +31,9 @@
 //      plan's own top-level reuse[]/newArtifacts[] pool (schema can't
 //      express "this array's values must appear as a .path in that other
 //      array" either).
+//   3. If scenarios.length exceeds NFR-001's typical-story threshold (6),
+//      a plan-level performanceNote is required (schema can't express
+//      "this string field is required only when that array is long enough").
 //
 // NODE VERSION NOTE: this script uses fs.globSync (node:fs), which requires
 // Node 22+. Confirmed working locally on v24. If this ever runs in CI on an
@@ -195,6 +198,19 @@ function checkDesignCompleteness(plan, designFilePath) {
         );
       }
     }
+  }
+
+  // Third completeness axis: NFR-001 (Helix PRD doc 2580) defines a tiered
+  // pipeline-runtime target — <=15 min for a typical story (<=6 scenarios),
+  // <=25 min ceiling for a complex story (7+ scenarios). A plan can legitimately
+  // cross that line, but it must be a stated decision, not a silent surprise
+  // Test Agent or a human discovers only once the run is already slow.
+  const NFR_001_TYPICAL_THRESHOLD = 6;
+  const scenarioCount = (plan.scenarios ?? []).length;
+  if (scenarioCount > NFR_001_TYPICAL_THRESHOLD && !plan.performanceNote?.trim()) {
+    errors.push(
+      `This plan has ${scenarioCount} scenarios, exceeding NFR-001's typical-story threshold of ${NFR_001_TYPICAL_THRESHOLD} (tiered target: <=15 min for <=6 scenarios, <=25 min ceiling for 7+). A plan-level "performanceNote" is required once that threshold is crossed, stating the decision (accept the longer run, or split the ticket) — it is currently missing or empty.`
+    );
   }
 
   return errors;
