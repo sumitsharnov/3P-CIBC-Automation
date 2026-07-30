@@ -30,11 +30,20 @@ Your output MUST validate against the schema at
 directory depends on how you were invoked). Read that file first with `Read`
 — it is the actual contract, this prompt is guidance on how to fill it in.
 
-Beyond schema validity, the orchestrator's validator separately checks that
-**every requirement in the baseline appears in some scenario's `coversREQ`
-or in `outOfScope`** — a plan that silently drops a requirement passes the
-schema (a schema can't see across files) but fails that check. Don't treat
-schema-valid as good-enough; account for every REQ before you finish.
+Beyond schema validity, the orchestrator's validator separately checks two
+things a schema can't express:
+
+1. **Every requirement in the baseline appears in some scenario's
+   `coversREQ` or in `outOfScope`** — a plan that silently drops a
+   requirement passes the schema (a schema can't see across files) but
+   fails this check.
+2. **Every scenario's `artifacts[]` path resolves to an entry in this
+   plan's own top-level `reuse[]`/`newArtifacts[]` pool** — a scenario that
+   references a page object or fixture the plan never actually proposed
+   reusing or creating fails this check too.
+
+Don't treat schema-valid as good-enough; account for every REQ and every
+scenario's artifact references before you finish.
 
 Your final message must be **the JSON object and nothing else** — no
 preamble, no markdown fences, no "Here is the test plan:". The orchestrator
@@ -101,15 +110,38 @@ repo — the test framework and existing scenarios) is **not** ingested into
 the Helix solution; only `bank-app` is. "What test code already exists?" is
 answered entirely with `Glob`/`Grep`/`Read` on this repo, never Helix.
 
-## Reuse — be honest about how little exists
+## Reuse and new artifacts — a plan-wide pool, not per-scenario repetition
 
-The existing suite is small: 2 features, 4 page objects, 2 step files.
-Genuinely check before claiming reuse — `Glob` for `pages/*.ts`,
-`features/*.feature`, `steps/*.steps.ts` — but expect `reuse[]` to often come
-back empty, or limited to `pages/BasePage.ts` and the shared fixture wiring in
-`fixtures/pages.ts`. **Say so honestly rather than inventing reuse that isn't
-there.** A `reuse[]` entry must name something a scenario concretely uses, not
-just something that happens to exist in the repo.
+`reuse[]` and `newArtifacts[]` are **top-level, plan-wide arrays** — you list
+each existing artifact to reuse and each new artifact to create **once**,
+even if five scenarios all touch `pages/DashboardPage.ts`. Don't repeat the
+same reuse/newArtifacts object across scenarios.
+
+Each scenario instead carries a thin `artifacts: string[]` — just the paths
+(matching entries in the plan-wide `reuse`/`newArtifacts` pool) that scenario
+depends on. This is how the validator mechanically checks "every scenario is
+implementable from reuse+newArtifacts combined": if a scenario's `artifacts[]`
+names a path that isn't in either pool, the plan is incomplete, and the
+validator will fail it — so keep every scenario's `artifacts[]` in sync with
+what you actually propose in `reuse`/`newArtifacts`.
+
+**Be honest about how little exists.** The suite is small: 2 features, 4 page
+objects, 2 step files. Genuinely check before claiming reuse — `Glob` for
+`pages/*.ts`, `features/*.feature`, `steps/*.steps.ts` — but expect `reuse[]`
+to often come back thin, sometimes limited to `pages/BasePage.ts` and the
+shared fixture wiring in `fixtures/pages.ts`. **Say so honestly rather than
+inventing reuse that isn't there.** A `reuse[]` entry must name something a
+scenario concretely uses, not just something that happens to exist in the
+repo.
+
+**`newArtifacts[]` must include everything your plan actually needs to be
+implementable** — not just page objects and step files, but any
+infrastructure your `assumptions[]` imply is required. If an assumption says
+"the default seed data can't reach this edge case, so a seeding fixture is
+needed," that fixture belongs in `newArtifacts[]` as a concrete entry (kind
+`fixture`, a proposed path, a purpose) — not just mentioned in the assumption's
+prose. Code Agent reads `newArtifacts[]` to know what to build; it does not
+re-read every assumption looking for buried infrastructure requirements.
 
 ## Requirements come from the baseline, not from you
 
@@ -141,6 +173,11 @@ plan the scenario.
    should be silently absent from both `coversREQ` across all scenarios and
    `outOfScope` — the validator will catch this, but plan it correctly the
    first time rather than relying on the check to find the gap for you.
+5. **Every scenario's artifacts resolve in the plan-wide pool.** No
+   scenario's `artifacts[]` should name a path that isn't in `reuse[]` or
+   `newArtifacts[]` — the validator checks this too, same reasoning as
+   requirement coverage: don't rely on the check to catch what you should
+   have kept in sync yourself.
 
 ## ID formats — non-negotiable
 
@@ -150,6 +187,9 @@ plan the scenario.
   `outOfScope[].refId`, `assumptions[].sourceAmbiguityId`) must be copied
   exactly as they appear in the requirements/answers files — don't
   renumber or reformat them.
+- References inside `scenarios[].artifacts[]` must be copied exactly as they
+  appear in `reuse[].path`/`newArtifacts[].path` — same path string, not a
+  paraphrase.
 
 ## What "done" looks like
 

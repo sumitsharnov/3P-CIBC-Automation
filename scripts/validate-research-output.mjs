@@ -10,31 +10,39 @@
 //
 // Usage:
 //   node scripts/validate-research-output.mjs <file.json> [<file2.json> ...]
-//   npm run validate:research-output -- agent-output/ResearchAgent-Output/CAP-19.requirements.json
-//   npm run validate:design-output -- agent-output/DesignAgent-Output/CAP-19.design.json
+//   node scripts/validate-research-output.mjs --only=research   (requirements+answers only)
+//   node scripts/validate-research-output.mjs --only=design     (design plans only)
+//   npm run validate:research-output   -> --only=research
+//   npm run validate:design-output     -> --only=design
 //
-// With no arguments, validates every *.requirements.json/*.answers.json under
-// agent-output/ResearchAgent-Output/ and every *.design.json under
-// agent-output/DesignAgent-Output/.
+// With no arguments and no --only flag, validates every *.requirements.json/
+// *.answers.json under agent-output/ResearchAgent-Output/ and every
+// *.design.json under agent-output/DesignAgent-Output/ — i.e. everything.
+// --only exists so the two npm scripts actually differ instead of both being
+// the same full sweep under different names.
 //
-// Design-plan completeness check: every requirements[].id in the baseline
-// (<ticket>.requirementsFile) must appear in some scenario's coversREQ or in
-// outOfScope with refType "REQ". A design plan that silently drops a
-// requirement passes the schema (schema can't see across files) but fails
-// this script — that's the point of doing this here instead of only in the
-// prompt.
+// Design-plan completeness checks (two axes, neither expressible in JSON
+// Schema alone):
+//   1. Every requirements[].id in the baseline (<ticket>.requirementsFile)
+//      must appear in some scenario's coversREQ or in outOfScope with
+//      refType "REQ". A design plan that silently drops a requirement
+//      passes the schema (schema can't see across files) but fails this.
+//   2. Every scenario's artifacts[] path must resolve to an entry in the
+//      plan's own top-level reuse[]/newArtifacts[] pool (schema can't
+//      express "this array's values must appear as a .path in that other
+//      array" either).
 //
 // NODE VERSION NOTE: this script uses fs.globSync (node:fs), which requires
 // Node 22+. Confirmed working locally on v24. If this ever runs in CI on an
 // older Node image it will fail — pin the Node version (e.g. actions/setup-node
 // with node-version: '22' or later) when wiring this into a workflow.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, globSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { globSync } from 'node:fs';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+import { renderRequirementsMarkdown, renderDesignMarkdown } from './render-plan.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -45,20 +53,40 @@ const DESIGN_SCHEMA_PATH = path.join(SCHEMAS_DIR, 'design-output.schema.json');
 const RESEARCH_OUTPUT_DIR = path.join(REPO_ROOT, 'agent-output', 'ResearchAgent-Output');
 const DESIGN_OUTPUT_DIR = path.join(REPO_ROOT, 'agent-output', 'DesignAgent-Output');
 
-function resolveTargets(argv) {
-  if (argv.length > 0) {
-    return argv.map((p) => path.resolve(p));
-  }
-  const patterns = [
+const ONLY_PATTERNS = {
+  research: [
     path.join(RESEARCH_OUTPUT_DIR, '*.requirements.json'),
     path.join(RESEARCH_OUTPUT_DIR, '*.answers.json'),
-    path.join(DESIGN_OUTPUT_DIR, '*.design.json'),
-  ].map((p) => p.replace(/\\/g, '/'));
-  const matches = patterns.flatMap((pattern) => globSync(pattern));
+  ],
+  design: [path.join(DESIGN_OUTPUT_DIR, '*.design.json')],
+};
+
+function resolveTargets(argv) {
+  const onlyArg = argv.find((a) => a.startsWith('--only='));
+  const pathArgs = argv.filter((a) => !a.startsWith('--only='));
+
+  if (pathArgs.length > 0) {
+    return pathArgs.map((p) => path.resolve(p));
+  }
+
+  let patterns;
+  let describeScope;
+  if (onlyArg) {
+    const kind = onlyArg.slice('--only='.length);
+    if (!ONLY_PATTERNS[kind]) {
+      console.error(`Unknown --only value "${kind}" — expected "research" or "design".`);
+      process.exit(2);
+    }
+    patterns = ONLY_PATTERNS[kind];
+    describeScope = `--only=${kind}`;
+  } else {
+    patterns = [...ONLY_PATTERNS.research, ...ONLY_PATTERNS.design];
+    describeScope = 'the full sweep (research + design)';
+  }
+
+  const matches = patterns.flatMap((pattern) => globSync(pattern.replace(/\\/g, '/')));
   if (matches.length === 0) {
-    console.error(
-      `No *.requirements.json/*.answers.json under ${RESEARCH_OUTPUT_DIR} and no *.design.json under ${DESIGN_OUTPUT_DIR}`
-    );
+    console.error(`No files found for ${describeScope}.`);
     process.exit(2);
   }
   return matches;
@@ -150,6 +178,25 @@ function checkDesignCompleteness(plan, designFilePath) {
     }
   }
 
+  // Second completeness axis: every scenario must be implementable from the
+  // plan-wide reuse[]/newArtifacts[] pool. A scenario listing an artifacts[]
+  // path that isn't in either pool means the plan references something it
+  // never actually proposed reusing or creating — exactly the "Code Agent
+  // has no signal" gap this check exists to catch.
+  const poolPaths = new Set([
+    ...(plan.reuse ?? []).map((r) => r.path),
+    ...(plan.newArtifacts ?? []).map((a) => a.path),
+  ]);
+  for (const scenario of plan.scenarios ?? []) {
+    for (const artifactPath of scenario.artifacts ?? []) {
+      if (!poolPaths.has(artifactPath)) {
+        errors.push(
+          `Scenario ${scenario.id} lists artifact "${artifactPath}" in its artifacts[], but that path does not appear in the plan's top-level reuse[] or newArtifacts[]. Every scenario artifact must resolve to something the plan actually proposes reusing or creating.`
+        );
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -203,7 +250,7 @@ function main() {
       const completenessErrors = checkDesignCompleteness(data, target);
       if (completenessErrors.length > 0) {
         anyFailed = true;
-        console.error(`FAIL  ${relPath}  (${kind}) — schema valid, but requirement-coverage check failed:`);
+        console.error(`FAIL  ${relPath}  (${kind}) — schema valid, but completeness check failed:`);
         for (const err of completenessErrors) {
           console.error(`  ${err}`);
         }
@@ -211,7 +258,36 @@ function main() {
       }
     }
 
-    console.log(`PASS  ${relPath}  (${kind})`);
+    // Regenerate the sibling .md immediately on a pass — a stale rendering
+    // next to a freshly validated JSON is exactly the drift this exists to
+    // prevent. answers kind has no markdown rendering (see render-plan.mjs).
+    let mdNote = '';
+    try {
+      if (kind === 'output') {
+        const answersPath = target.replace(/\.requirements\.json$/, '.answers.json');
+        const answersDoc = existsSync(answersPath) ? JSON.parse(readFileSync(answersPath, 'utf-8')) : null;
+        const md = renderRequirementsMarkdown(data, answersDoc, path.basename(target));
+        const mdPath = target.replace(/\.requirements\.json$/, '.requirements.md');
+        writeFileSync(mdPath, md, 'utf-8');
+        mdNote = `  -> ${path.relative(REPO_ROOT, mdPath)}`;
+      } else if (kind === 'design') {
+        const baselinePath = path.resolve(REPO_ROOT, data.ticket.requirementsFile);
+        const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf-8')) : null;
+        const answersPath = baselinePath.replace(/\.requirements\.json$/, '.answers.json');
+        const hasAnswersFile = existsSync(answersPath);
+        const md = renderDesignMarkdown(data, baseline, hasAnswersFile, path.basename(target));
+        const mdPath = target.replace(/\.design\.json$/, '.design.md');
+        writeFileSync(mdPath, md, 'utf-8');
+        mdNote = `  -> ${path.relative(REPO_ROOT, mdPath)}`;
+      }
+    } catch (err) {
+      // Rendering failure doesn't invalidate the JSON — it's still the
+      // canonical artifact — but flag it loudly rather than silently
+      // leaving a stale/missing .md.
+      mdNote = `  -> MARKDOWN RENDER FAILED: ${err.message}`;
+    }
+
+    console.log(`PASS  ${relPath}  (${kind})${mdNote}`);
   }
 
   if (anyFailed) {

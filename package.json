@@ -8,8 +8,10 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "validate:research-output": "node scripts/validate-research-output.mjs",
-    "validate:design-output": "node scripts/validate-research-output.mjs",
+    "validate:all-output": "node scripts/validate-research-output.mjs",
+    "validate:research-output": "node scripts/validate-research-output.mjs --only=research",
+    "validate:design-output": "node scripts/validate-research-output.mjs --only=design",
+    "render:plan": "node scripts/render-plan.mjs",
     "check:ambiguity-gate": "node scripts/check-ambiguity-gate.mjs",
     "bddgen": "bddgen",
     "test:e2e": "npm run bddgen && playwright test",

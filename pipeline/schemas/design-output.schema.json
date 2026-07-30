@@ -2,9 +2,9 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "design-agent-output.schema.json",
   "title": "Design Agent Output — Test Plan",
-  "description": "The only thing the Design Agent produces. Code Agent consumes this shape, not prose, and owns all file writing — Design Agent plans, it does not write test files. Every requirement from the source requirements.json must appear in some scenario's coversREQ or in outOfScope; the validator (not just this schema) enforces that cross-file, since JSON Schema alone can't check it.",
+  "description": "The only thing the Design Agent produces. Code Agent consumes this shape, not prose, and owns all file writing — Design Agent plans, it does not write test files. Every requirement from the source requirements.json must appear in some scenario's coversREQ or in outOfScope; every scenario's artifacts[] must resolve to an entry in the plan-wide reuse[]/newArtifacts[] pool. The validator (not just this schema) enforces both, since JSON Schema alone can't check cross-references.",
   "type": "object",
-  "required": ["ticket", "scenarios", "assumptions", "outOfScope"],
+  "required": ["ticket", "scenarios", "reuse", "newArtifacts", "assumptions", "outOfScope"],
   "additionalProperties": false,
   "properties": {
     "ticket": {
@@ -24,7 +24,7 @@
       "description": "One per test scenario. Not 1:1 with ACs — one AC may need multiple scenarios (happy-path + negative), or several related ACs may collapse into one scenario. The coversAC/coversREQ/coversEC arrays are what actually records the mapping.",
       "items": {
         "type": "object",
-        "required": ["id", "title", "tags", "steps", "coversAC", "coversREQ", "coversEC", "type", "reuse", "newArtifacts"],
+        "required": ["id", "title", "tags", "steps", "coversAC", "coversREQ", "coversEC", "type", "artifacts"],
         "additionalProperties": false,
         "properties": {
           "id": { "type": "string", "pattern": "^SC-[0-9]+$" },
@@ -63,40 +63,45 @@
             "type": "string",
             "enum": ["happy-path", "negative", "boundary"]
           },
-          "reuse": {
+          "artifacts": {
             "type": "array",
-            "description": "Existing artifacts in this repo this scenario should reuse. Honest emptiness is expected and fine — the suite is small; don't invent reuse that isn't real.",
-            "items": {
-              "type": "object",
-              "required": ["path", "kind", "why"],
-              "additionalProperties": false,
-              "properties": {
-                "path": { "type": "string", "description": "Path relative to repo root, e.g. pages/BasePage.ts." },
-                "kind": { "type": "string", "enum": ["page-object", "step-definition", "fixture"] },
-                "why": { "type": "string", "description": "What specifically this scenario reuses from it and why it fits, not just that it exists." }
-              }
-            }
-          },
-          "newArtifacts": {
-            "type": "array",
-            "description": "What Code Agent must create for this scenario. Design Agent proposes paths/purpose; Code Agent does the actual writing.",
-            "items": {
-              "type": "object",
-              "required": ["kind", "proposedPath", "purpose"],
-              "additionalProperties": false,
-              "properties": {
-                "kind": { "type": "string", "enum": ["feature-file", "page-object", "step-definition", "fixture"] },
-                "proposedPath": { "type": "string", "description": "Path relative to repo root, e.g. pages/DashboardPage.ts." },
-                "purpose": { "type": "string" }
-              }
-            }
+            "items": { "type": "string" },
+            "description": "Repo-relative paths this scenario depends on — each one MUST match a path appearing in this plan's top-level reuse[] or newArtifacts[] (enforced by the validator, not just this schema). This is how 'every scenario is implementable from reuse+newArtifacts combined' gets checked mechanically instead of just asserted in prose. Rarely empty — almost every scenario touches at least a page object."
           }
+        }
+      }
+    },
+    "reuse": {
+      "type": "array",
+      "description": "Existing artifacts in THIS repo that Code Agent should reuse rather than recreate, for the plan as a whole (not per-scenario — see each scenario's artifacts[] for which of these it needs). Empty array is a valid and honest answer when nothing applies — do not invent reuse. The suite is small (2 features, 4 page objects, 2 step files); expect this to sometimes be genuinely thin.",
+      "items": {
+        "type": "object",
+        "required": ["path", "kind", "why"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "description": "Repo-relative path, e.g. pages/LoginPage.ts." },
+          "kind": { "type": "string", "enum": ["page-object", "step-definition", "fixture", "helper"] },
+          "why": { "type": "string", "description": "What it provides that this plan needs — not just that it exists." }
+        }
+      }
+    },
+    "newArtifacts": {
+      "type": "array",
+      "description": "What Code Agent must create for this plan to be implementable, for the plan as a whole. Includes anything assumptions[] implies is needed (e.g. a seed-data fixture for edge cases the default seed data can't reach) — that need must show up here, not just in assumption prose.",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "purpose"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string", "enum": ["page-object", "step-definition", "fixture", "feature-file", "helper"] },
+          "path": { "type": "string", "description": "Proposed repo-relative path, following existing conventions, e.g. pages/DashboardPage.ts." },
+          "purpose": { "type": "string" }
         }
       }
     },
     "assumptions": {
       "type": "array",
-      "description": "Required, may be empty. Every non-blocking ambiguity from the baseline that Design Agent proceeded past goes here, plus any new assumptions Design Agent itself had to make. These must not silently vanish — Coverage Agent surfaces them at the end. If a human answers file resolved an ambiguity, that ambiguity does NOT need an entry here (it's resolved, not assumed) — but note in targetAreaNotes-equivalent reasoning if the answer changed the plan.",
+      "description": "Required, may be empty. Every non-blocking ambiguity from the baseline that Design Agent proceeded past goes here, plus any new assumptions Design Agent itself had to make. These must not silently vanish — Coverage Agent surfaces them at the end. If a human answers file resolved an ambiguity, that ambiguity does NOT need an entry here (it's resolved, not assumed).",
       "items": {
         "type": "object",
         "required": ["id", "text"],
