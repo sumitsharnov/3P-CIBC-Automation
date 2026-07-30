@@ -6,330 +6,272 @@
   "scenarios": [
     {
       "id": "SC-1",
-      "title": "Successful sign-on with demo credentials regardless of username letter casing",
+      "title": "Successful sign-on with demo credentials regardless of username casing",
       "tags": ["@login", "@smoke"],
       "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username \"demo\" and password \"demo\" (and repeat with \"DEMO\", \"Demo\", \"dEmO\")",
-        "Then I should be redirected to the accounts page in every case"
+        "Given the user is on the sign-on page",
+        "When they sign on with username \"demo\" and password \"demo\"",
+        "Then they are redirected to the accounts page",
+        "When they sign on with username \"DEMO\" and password \"demo\" (repeat for \"Demo\" and \"dEmO\")",
+        "Then they are redirected to the accounts page for each casing variant"
       ],
       "coversAC": ["AC-1"],
       "coversREQ": ["REQ-1", "REQ-2"],
       "coversEC": [],
       "type": "happy-path",
-      "reuse": [
-        { "path": "features/login.feature", "kind": "page-object", "why": "Existing 'Successful sign-on with valid demo credentials' scenario is the base to convert into a Scenario Outline with an Examples table for the casing variants." },
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "signOn(username, password) already fills both fields and submits via label/role locators verified against Login.jsx." },
-        { "path": "pages/AccountsPage.ts", "kind": "page-object", "why": "expectDisplayed() already asserts the /accounts URL redirect." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "Existing Given/When/Then steps ('I am on the sign-on page', 'I sign on with username {string} and password {string}', 'I should be redirected to the accounts page') already parameterize username/password, no new step text needed." },
-        { "path": "fixtures/pages.ts", "kind": "fixture", "why": "loginPage/accountsPage fixtures already wired." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "Convert the existing single-case scenario into a Scenario Outline with an Examples table covering demo, DEMO, Demo, dEmO as username values, each paired with password 'demo'." }
-      ]
+      "artifacts": ["pages/LoginPage.ts", "pages/AccountsPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
       "id": "SC-2",
-      "title": "Sign-on fails when password case does not exactly match 'demo'",
-      "tags": ["@login", "@negative"],
+      "title": "Sign-on succeeds when username has leading/trailing whitespace",
+      "tags": ["@login", "@boundary"],
       "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username \"demo\" and password \"DEMO\" (and repeat with \"Demo\")",
-        "Then I should remain on the sign-on page",
-        "And I should see the error 'Invalid card number or password. Please try again (demo / demo).' rendered with role=alert"
+        "Given the user is on the sign-on page",
+        "When they sign on with username \" demo \" (leading/trailing spaces) and password \"demo\"",
+        "Then they are redirected to the accounts page, reflecting the implementation's trim-before-compare behavior"
       ],
       "coversAC": ["AC-1"],
-      "coversREQ": ["REQ-3", "REQ-4", "REQ-5", "REQ-6"],
-      "coversEC": [],
-      "type": "negative",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "signOn() and expectErrorVisible() cover input and alert-visibility assertions." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "'I sign on with username {string} and password {string}' and 'I should see the sign-on error message' steps are reusable as-is." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New Scenario Outline for password case-sensitivity, asserting no navigation occurred and exact error text." },
-        { "kind": "page-object", "proposedPath": "pages/LoginPage.ts", "purpose": "Add expectStaysOnSignOnPage() (assert URL still /login) and expectExactErrorText() (assert getByRole('alert') has exact text 'Invalid card number or password. Please try again (demo / demo).') rather than the existing loose expectErrorVisible()." },
-        { "kind": "step-definition", "proposedPath": "steps/login.steps.ts", "purpose": "Add 'Then I should remain on the sign-on page' and 'Then I should see the exact invalid-credentials error message' steps." }
-      ]
+      "coversREQ": [],
+      "coversEC": ["EC-1"],
+      "type": "boundary",
+      "artifacts": ["pages/LoginPage.ts", "pages/AccountsPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
       "id": "SC-3",
-      "title": "Sign-on fails with an arbitrary invalid username/password combination",
-      "tags": ["@login", "@negative"],
+      "title": "Sign-on fails when password casing does not exactly match",
+      "tags": ["@login"],
       "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username \"demo\" and password \"wrongpassword\"",
-        "Then I should remain on the sign-on page",
-        "And I should see the error 'Invalid card number or password. Please try again (demo / demo).' rendered with role=alert"
+        "Given the user is on the sign-on page",
+        "When they sign on with username \"demo\" and password \"DEMO\"",
+        "Then they remain on the sign-on page and see the generic invalid-credentials error"
+      ],
+      "coversAC": ["AC-1"],
+      "coversREQ": ["REQ-3"],
+      "coversEC": [],
+      "type": "negative",
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
+    },
+    {
+      "id": "SC-4",
+      "title": "Sign-on fails when password has leading/trailing whitespace",
+      "tags": ["@login", "@boundary"],
+      "steps": [
+        "Given the user is on the sign-on page",
+        "When they sign on with username \"demo\" and password \" demo \" (leading/trailing spaces)",
+        "Then they remain on the sign-on page and see the generic invalid-credentials error, since password is compared as-is with no trim"
+      ],
+      "coversAC": ["AC-1"],
+      "coversREQ": ["REQ-3"],
+      "coversEC": ["EC-2"],
+      "type": "boundary",
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
+    },
+    {
+      "id": "SC-5",
+      "title": "Sign-on fails with a generic, accessible error for any invalid credential pair",
+      "tags": ["@login"],
+      "steps": [
+        "Given the user is on the sign-on page",
+        "When they sign on with username \"demo\" and password \"wrongpassword\"",
+        "Then they remain on the sign-on page (no navigation occurs)",
+        "And an inline error with text \"Invalid card number or password. Please try again (demo / demo).\" is shown",
+        "And that error element has role=\"alert\""
       ],
       "coversAC": ["AC-2"],
       "coversREQ": ["REQ-4", "REQ-5", "REQ-6"],
       "coversEC": [],
       "type": "negative",
-      "reuse": [
-        { "path": "features/login.feature", "kind": "page-object", "why": "Existing 'Sign-on fails with invalid credentials' scenario already covers this input pair; strengthen its assertions." },
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "signOn() reused for input." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "Existing Given/When steps reused." }
-      ],
-      "newArtifacts": [
-        { "kind": "step-definition", "proposedPath": "steps/login.steps.ts", "purpose": "Swap the existing loose 'I should see the sign-on error message' assertion for the new exact-text/role=alert step added in SC-2, and add 'I should remain on the sign-on page'." }
-      ]
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
-      "id": "SC-4",
-      "title": "Sign-on fails with both username and password empty, using the same generic error",
-      "tags": ["@login", "@negative"],
+      "id": "SC-6",
+      "title": "Sign-on with both username and password empty shows the same generic error",
+      "tags": ["@login", "@boundary"],
       "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username \"\" and password \"\"",
-        "Then I should see the error 'Invalid card number or password. Please try again (demo / demo).' — not a distinct required-field message"
+        "Given the user is on the sign-on page",
+        "When they submit the sign-on form with username \"\" and password \"\"",
+        "Then the same generic invalid-credentials error is shown (no distinct 'required field' message appears)"
       ],
       "coversAC": ["AC-3"],
       "coversREQ": ["REQ-7"],
       "coversEC": [],
-      "type": "negative",
-      "reuse": [
-        { "path": "features/login.feature", "kind": "page-object", "why": "Existing 'Sign-on fails with empty credentials' scenario already exercises this input; strengthen to assert exact text, ruling out any separate validation message." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "Existing Given/When steps reused." }
-      ],
-      "newArtifacts": [
-        { "kind": "step-definition", "proposedPath": "steps/login.steps.ts", "purpose": "Reuse the exact-error-text step from SC-2 in place of the current generic 'I should see the sign-on error message' check." }
-      ]
-    },
-    {
-      "id": "SC-5",
-      "title": "Sign-on fails when only one of username/password is populated",
-      "tags": ["@login", "@boundary"],
-      "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username \"demo\" and password \"\"",
-        "Then I should see the same generic invalid-credentials error",
-        "When I sign on with username \"\" and password \"demo\"",
-        "Then I should see the same generic invalid-credentials error"
-      ],
-      "coversAC": [],
-      "coversREQ": ["REQ-4", "REQ-5"],
-      "coversEC": ["EC-3"],
       "type": "boundary",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "signOn() already accepts empty-string args for either field." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "Existing parameterized When/Then steps handle this without new step text." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New Scenario Outline with Examples for (username='demo', password='') and (username='', password='demo')." }
-      ]
-    },
-    {
-      "id": "SC-6",
-      "title": "Sign-on succeeds when username has leading/trailing whitespace",
-      "tags": ["@login", "@boundary"],
-      "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username \" demo \" and password \"demo\"",
-        "Then I should be redirected to the accounts page"
-      ],
-      "coversAC": [],
-      "coversREQ": [],
-      "coversEC": ["EC-1"],
-      "type": "boundary",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "signOn()/redirect assertion reused." },
-        { "path": "pages/AccountsPage.ts", "kind": "page-object", "why": "expectDisplayed() reused for redirect assertion." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "Existing parameterized steps handle the whitespace-padded string value directly." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New scenario asserting whitespace-padded username still succeeds, per Login.jsx's username.trim().toLowerCase() comparison (see assumption A-1)." }
-      ]
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
       "id": "SC-7",
-      "title": "Sign-on fails when password has leading/trailing whitespace",
+      "title": "Sign-on with only one of username/password populated shows the same generic error",
       "tags": ["@login", "@boundary"],
       "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username \"demo\" and password \" demo \"",
-        "Then I should remain on the sign-on page",
-        "And I should see the invalid-credentials error"
+        "Given the user is on the sign-on page",
+        "When they submit the sign-on form with username \"demo\" and password \"\"",
+        "Then the generic invalid-credentials error is shown",
+        "When they submit the sign-on form with username \"\" and password \"demo\"",
+        "Then the generic invalid-credentials error is shown"
       ],
       "coversAC": [],
       "coversREQ": [],
-      "coversEC": ["EC-2"],
+      "coversEC": ["EC-3"],
       "type": "boundary",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "signOn() and error/stays-on-page assertions from SC-2 reused." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "Existing parameterized steps handle the whitespace-padded password value directly." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New scenario asserting whitespace-padded password fails, since only username is trimmed in Login.jsx (asymmetric behavior)." }
-      ]
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
       "id": "SC-8",
-      "title": "Sign-on fails gracefully with special characters and very long input",
+      "title": "Repeated invalid sign-on attempts show no unexpected accumulation or lockout state",
       "tags": ["@login", "@boundary"],
       "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username containing special characters (e.g. \"<script>demo</script>\" or \"demo';--\") and an arbitrary password",
-        "When I sign on with a very long username/password string (e.g. 500+ characters)",
-        "Then in each case I should remain on the sign-on page with the standard invalid-credentials error and no rendering/JS error"
-      ],
-      "coversAC": [],
-      "coversREQ": [],
-      "coversEC": ["EC-6"],
-      "type": "boundary",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "signOn() and error/stays-on-page assertions reused." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "Existing parameterized steps accept arbitrary string values." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New Scenario Outline with Examples for special-character and long-string inputs, asserting the standard invalid-credentials path (no crash/rendering error)." }
-      ]
-    },
-    {
-      "id": "SC-9",
-      "title": "Repeated invalid sign-on attempts do not accumulate errors or disable the form",
-      "tags": ["@login", "@boundary"],
-      "steps": [
-        "Given I am on the sign-on page",
-        "When I sign on with username \"demo\" and password \"wrong1\"",
-        "And I sign on again with username \"demo\" and password \"wrong2\"",
-        "And I sign on again with username \"demo\" and password \"wrong3\"",
-        "Then exactly one error message should be visible after each attempt (no stacking)",
-        "And the Sign On button should remain enabled and usable for a subsequent attempt"
+        "Given the user is on the sign-on page",
+        "When they submit invalid credentials multiple times in a row (e.g. 3 consecutive failed attempts)",
+        "Then a single generic invalid-credentials error is shown after each attempt, with no stacked/duplicated error messages",
+        "And the Sign On button remains enabled and clickable (no lockout or throttling behavior)"
       ],
       "coversAC": [],
       "coversREQ": [],
       "coversEC": ["EC-4"],
       "type": "boundary",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "signOn() reused for repeated submission." },
-        { "path": "steps/login.steps.ts", "kind": "step-definition", "why": "Existing When step is repeatable across multiple submissions in one scenario." }
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
+    },
+    {
+      "id": "SC-9",
+      "title": "Sign-on with special characters or very long input strings degrades gracefully to the generic error",
+      "tags": ["@login", "@boundary"],
+      "steps": [
+        "Given the user is on the sign-on page",
+        "When they sign on with a username/password containing special characters (e.g. \"<script>\", \"' OR 1=1\")",
+        "Then the generic invalid-credentials error is shown with no rendering or JavaScript error",
+        "When they sign on with a very long username/password string (e.g. 500+ characters)",
+        "Then the generic invalid-credentials error is shown with no rendering or JavaScript error"
       ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New scenario driving 3 consecutive failed submissions and asserting single-error/button-enabled state after each." },
-        { "kind": "page-object", "proposedPath": "pages/LoginPage.ts", "purpose": "Add expectSingleErrorMessage() (assert exactly one alert-role element present) and expectSignOnButtonEnabled()." },
-        { "kind": "step-definition", "proposedPath": "steps/login.steps.ts", "purpose": "Add 'Then exactly one error message should be visible' and 'Then the Sign On button should remain enabled' steps." }
-      ]
+      "coversAC": [],
+      "coversREQ": [],
+      "coversEC": ["EC-6"],
+      "type": "boundary",
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
       "id": "SC-10",
       "title": "Sign-on page clearly discloses it is a non-real demo",
       "tags": ["@login"],
       "steps": [
-        "Given I am on the sign-on page",
-        "Then I should see the disclaimer 'Demo mockup — not a real bank. Do not enter real credentials.'",
-        "And I should see the footer text framing the page as a fictional, non-backed banking demo (e.g. '© 2026 App Bank (fictional). For demonstration purposes only.')"
+        "Given the user is on the sign-on page",
+        "Then a visible disclaimer reading \"Demo mockup — not a real bank. Do not enter real credentials.\" is shown near the form",
+        "And the page footer reads \"© 2026 App Bank (fictional). For demonstration purposes only.\", framing the whole page as a fictional, non-backed banking demo"
       ],
       "coversAC": ["AC-4"],
       "coversREQ": ["REQ-8", "REQ-13"],
       "coversEC": [],
       "type": "happy-path",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "goto() reused to arrive at /login before asserting page content." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New scenario asserting both the inline disclaimer paragraph and the page footer's fictional-demo framing text are visible, verified against exact text in Login.jsx." },
-        { "kind": "page-object", "proposedPath": "pages/LoginPage.ts", "purpose": "Add expectDisclaimerVisible() and expectFictionalFramingVisible() asserting the exact disclaimer/footer text nodes." },
-        { "kind": "step-definition", "proposedPath": "steps/login.steps.ts", "purpose": "Add 'Then I should see the demo disclaimer' and 'Then I should see the fictional-demo footer text' steps." }
-      ]
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
       "id": "SC-11",
-      "title": "Forgot password and Register links are present and navigable",
+      "title": "Sign-on page exposes Forgot password and Register navigation links",
       "tags": ["@login"],
       "steps": [
-        "Given I am on the sign-on page",
-        "Then a 'Forgot password?' link should be visible and clicking it should navigate away from /login (target flow behavior not asserted)",
-        "And, separately, a 'Register' link should be visible and clicking it should navigate away from /login (target flow behavior not asserted)"
+        "Given the user is on the sign-on page",
+        "Then a \"Forgot password?\" link is visible and navigable (target flow behavior not asserted)",
+        "And a \"Register\" link is visible and navigable (target flow behavior not asserted)"
       ],
       "coversAC": ["AC-5"],
       "coversREQ": ["REQ-9", "REQ-10"],
       "coversEC": [],
       "type": "happy-path",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "goto() reused to reach /login before asserting on the links." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New scenario asserting both links are visible/enabled and navigate (only presence/reachability asserted, per REQ-9/REQ-10 — not the destination pages' behavior)." },
-        { "kind": "page-object", "proposedPath": "pages/LoginPage.ts", "purpose": "Add expectForgotPasswordLinkVisible(), expectRegisterLinkVisible(), clickForgotPasswordLink(), clickRegisterLink() using getByRole('link', { name: ... }) verified against the <Link> elements in Login.jsx." },
-        { "kind": "step-definition", "proposedPath": "steps/login.steps.ts", "purpose": "Add steps for asserting link visibility and navigating via each link." }
-      ]
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
       "id": "SC-12",
-      "title": "Remember this device checkbox can be checked and unchecked",
+      "title": "Remember this device checkbox can be toggled",
       "tags": ["@login"],
       "steps": [
-        "Given I am on the sign-on page",
-        "When I check the 'Remember this device' checkbox",
-        "Then the checkbox should be checked",
-        "When I uncheck the 'Remember this device' checkbox",
-        "Then the checkbox should be unchecked",
-        "(No assertion is made about any persisted state across sessions — decorative only per AC-6)"
+        "Given the user is on the sign-on page",
+        "When they check the \"Remember this device\" checkbox",
+        "Then the checkbox reflects a checked state",
+        "When they uncheck the \"Remember this device\" checkbox",
+        "Then the checkbox reflects an unchecked state (no persisted-state assertion is made)"
       ],
       "coversAC": [],
       "coversREQ": ["REQ-11"],
       "coversEC": [],
       "type": "happy-path",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "goto() reused to reach /login before interacting with the checkbox." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New scenario toggling the checkbox and asserting only its in-page checked/unchecked state — explicitly not any persisted behavior, which is out of scope per AC-6." },
-        { "kind": "page-object", "proposedPath": "pages/LoginPage.ts", "purpose": "Add setRememberDevice(checked: boolean) and expectRememberDeviceChecked(checked: boolean) using getByRole('checkbox', { name: 'Remember this device' })." },
-        { "kind": "step-definition", "proposedPath": "steps/login.steps.ts", "purpose": "Add 'When I check/uncheck the Remember this device checkbox' and 'Then the checkbox should be checked/unchecked' steps." }
-      ]
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
     },
     {
       "id": "SC-13",
-      "title": "Sign-on page contains no navigation to the simulated-outage /login-broken page",
+      "title": "Sign-on page contains no navigation link to the simulated-outage /login-broken page",
       "tags": ["@login"],
       "steps": [
-        "Given I am on the sign-on page",
-        "Then the only navigable links on the page should be to '/', '/forgot-password', and '/register'",
-        "And there should be no link or button that navigates to /login-broken"
+        "Given the user is on the sign-on page",
+        "Then no link or button on the page navigates to \"/login-broken\"",
+        "And the only navigable links present are the logo/home link, \"Forgot password?\", and \"Register\""
       ],
       "coversAC": [],
       "coversREQ": ["REQ-12"],
       "coversEC": ["EC-5"],
       "type": "negative",
-      "reuse": [
-        { "path": "pages/LoginPage.ts", "kind": "page-object", "why": "goto() reused to reach /login before enumerating its links." }
-      ],
-      "newArtifacts": [
-        { "kind": "feature-file", "proposedPath": "features/login.feature", "purpose": "New scenario asserting /login's link set does not include /login-broken, guarding against future accidental conflation of the two pages (see assumption A-2)." },
-        { "kind": "page-object", "proposedPath": "pages/LoginPage.ts", "purpose": "Add expectNoLinkTo(path: string) that asserts no anchor/Link on the page has an href/to targeting the given path (used with '/login-broken')." },
-        { "kind": "step-definition", "proposedPath": "steps/login.steps.ts", "purpose": "Add 'Then the sign-on page should contain no link to {string}' step." }
-      ]
+      "artifacts": ["pages/LoginPage.ts", "pages/BasePage.ts", "steps/login.steps.ts", "fixtures/pages.ts", "features/login.feature"]
+    }
+  ],
+  "reuse": [
+    {
+      "path": "pages/LoginPage.ts",
+      "kind": "page-object",
+      "why": "Already implements goto(), signOn(), expectErrorVisible()/expectErrorText() for the core sign-on flow this plan builds on. Code Agent extends it with new methods for the disclaimer/footer text, the Forgot password/Register links, the Remember-this-device checkbox toggle, and the no-cross-navigation-to-/login-broken check."
+    },
+    {
+      "path": "pages/AccountsPage.ts",
+      "kind": "page-object",
+      "why": "expectDisplayed() already asserts redirect to /accounts, needed by the happy-path sign-on scenarios (SC-1, SC-2)."
+    },
+    {
+      "path": "pages/BasePage.ts",
+      "kind": "page-object",
+      "why": "Shared open()/currentUrl() helper that LoginPage.goto() relies on for every scenario's background navigation step."
+    },
+    {
+      "path": "steps/login.steps.ts",
+      "kind": "step-definition",
+      "why": "Already wires 'I am on the sign-on page', 'I sign on with username/password', 'redirected to accounts page', and 'sign-on error message' steps. Code Agent extends it with new step defs for casing/whitespace variants, disclaimer/footer text, link presence, checkbox toggling, repeated-submission, special-character/long-string input, and no-cross-navigation assertions."
+    },
+    {
+      "path": "fixtures/pages.ts",
+      "kind": "fixture",
+      "why": "Provides the loginPage and accountsPage fixture instances every scenario's step definitions depend on."
+    }
+  ],
+  "newArtifacts": [
+    {
+      "kind": "feature-file",
+      "path": "features/login.feature",
+      "purpose": "Existing file already covers a basic happy/invalid/empty-credentials trio; extend it with the additional CAP-15 scenarios (casing/whitespace variants, exact-match password negatives, partial-empty and repeated-submission boundaries, special-character/long-string input, disclaimer/footer text, Forgot-password/Register link presence, Remember-device checkbox toggling, and the no-link-to-/login-broken check) so every REQ/EC in this plan is actually exercised."
     }
   ],
   "assumptions": [
     {
       "id": "A-1",
       "sourceAmbiguityId": "Q-1",
-      "text": "Q-1 (non-blocking, no answers file present) asks whether whitespace-trimming of the username should be part of the tested contract. Login.jsx currently does username.trim().toLowerCase() before comparison, so leading/trailing whitespace in the username currently succeeds when paired with the correct password. Absent an authoritative answer, this plan tests the implemented behavior as-is (SC-6/EC-1) rather than assuming it should be rejected, and separately verifies the password side is NOT trimmed (SC-7/EC-2), so the asymmetry is captured either way Q-1 is eventually resolved."
+      "text": "Ambiguity Q-1 (whether username whitespace-trimming is an intended, verifiable contract) is non-blocking and unresolved by any answers file. Per targetArea.notes, Login.jsx does call username.trim().toLowerCase() before comparing, so SC-2 verifies this as the actual current behavior (an edge case worth catching regressions on), but it is treated as an implementation detail being characterized, not a hardened requirement — it is not folded into REQ-1/REQ-2's coversREQ mapping."
     },
     {
       "id": "A-2",
       "sourceAmbiguityId": "Q-2",
-      "text": "Q-2 (non-blocking, no answers file present) asks whether a check confirming /login does not link to /login-broken should be planned. This plan includes it (SC-13/EC-5) as a low-cost regression guard against future accidental conflation of the working /login flow and the CAP-18 simulated-outage page, without asserting anything about /login-broken's own behavior (which remains out of scope per AC-7/REQ-12)."
+      "text": "Ambiguity Q-2 (whether a no-cross-navigation check between /login and /login-broken is needed) is non-blocking and unresolved by any answers file. Design Agent proceeded conservatively by including SC-13, which asserts /login's rendered links are limited to home/Forgot-password/Register and never /login-broken, directly per EC-5's rationale and targetArea.notes confirming this against Login.jsx's actual link set."
     },
     {
       "id": "A-3",
       "sourceAmbiguityId": null,
-      "text": "All locators in this plan (getByLabel('Card number or username'), getByLabel('Password', exact), getByRole('button', {name:'Sign On'}), getByRole('alert'), the Forgot password/Register links, and the Remember this device checkbox) were verified directly against C:\\Users\\sumit.kumar1\\Documents\\bank-app-1\\src\\pages\\Login.jsx source, not inferred from any graph/architecture tool — this ticket's scope is a single self-contained page component with no cross-component relationship question, so no Helix query was needed or used for structural planning."
+      "text": "The 'Remember this device' checkbox in Login.jsx has no id/htmlFor pairing but is wrapped by its <label> element (text 'Remember this device'), so it is assumed locatable via an accessible-name query (e.g. getByLabel/getByRole('checkbox', { name: ... })) without needing a new data-testid; if Code Agent finds this unreliable in practice, a testid should be requested rather than silently switching to a brittle CSS selector."
     }
   ],
   "outOfScope": [
     {
       "refType": "AC",
       "refId": "AC-6",
-      "reason": "Marked testable: false in the baseline — the 'Remember this device' checkbox is decorative only, with no persisted behavior to verify. SC-12 exercises REQ-11 (the checkbox can be checked/unchecked) but asserts no persisted state, per the baseline's own scoping."
+      "reason": "Marked testable: false in the baseline — the Remember-this-device checkbox has no persisted behavior to verify in this mock; only its toggle interaction (REQ-11) is covered, not any storage/session effect."
     },
     {
       "refType": "AC",
       "refId": "AC-7",
-      "reason": "Marked testable: false in the baseline — the /login-broken simulated-outage page belongs to CAP-18 and must not be conflated with /login's own test coverage. REQ-12 and EC-5 are covered by SC-13, which only confirms /login does not link to /login-broken; no assertions are made about /login-broken's own behavior."
+      "reason": "Marked testable: false in the baseline — the simulated-503 /login-broken page belongs to CAP-18 and must not be conflated with this ticket's /login coverage. This plan only asserts /login does not link to it (REQ-12/EC-5 via SC-13); it does not exercise /login-broken's own behavior."
     }
   ]
 }
