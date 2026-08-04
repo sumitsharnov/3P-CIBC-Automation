@@ -12,6 +12,7 @@
 //   node scripts/validate-research-output.mjs <file.json> [<file2.json> ...]
 //   node scripts/validate-research-output.mjs --only=research   (requirements+answers only)
 //   node scripts/validate-research-output.mjs --only=design     (design plans only)
+//   node scripts/validate-research-output.mjs --strict-uniformity  (uniformity warnings become failures)
 //   npm run validate:research-output   -> --only=research
 //   npm run validate:design-output     -> --only=design
 //
@@ -34,6 +35,17 @@
 //   3. If scenarios.length exceeds NFR-001's typical-story threshold (6),
 //      a plan-level performanceNote is required (schema can't express
 //      "this string field is required only when that array is long enough").
+//
+// Design-plan uniformity check (heuristic, WARN by default, not a
+// completeness axis): long generations are where attention dilution shows
+// up — later scenarios quietly getting thinner or dropping a field the
+// earlier ones have. Compares the first third of scenarios[] against the
+// last third (skips the middle, and skips entirely under 9 scenarios, where
+// the signal is meaningless). This is a quality heuristic, not a contract
+// violation — a plan can legitimately trip it and still be correct (e.g. a
+// ticket whose later scenarios really are simpler one-liners) — so by
+// default it only warns. Pass --strict-uniformity to make a warning exit
+// non-zero (e.g. for CI gating later).
 //
 // NODE VERSION NOTE: this script uses fs.globSync (node:fs), which requires
 // Node 22+. Confirmed working locally on v24. If this ever runs in CI on an
@@ -66,7 +78,7 @@ const ONLY_PATTERNS = {
 
 function resolveTargets(argv) {
   const onlyArg = argv.find((a) => a.startsWith('--only='));
-  const pathArgs = argv.filter((a) => !a.startsWith('--only='));
+  const pathArgs = argv.filter((a) => !a.startsWith('--only=') && a !== '--strict-uniformity');
 
   if (pathArgs.length > 0) {
     return pathArgs.map((p) => path.resolve(p));
@@ -216,6 +228,106 @@ function checkDesignCompleteness(plan, designFilePath) {
   return errors;
 }
 
+const UNIFORMITY_MIN_SCENARIOS = 9;
+const STEP_COUNT_DROP_THRESHOLD_PCT = 30;
+const TITLE_LENGTH_DROP_THRESHOLD_PCT = 40;
+// Fields whose "presence" isn't already fully covered by the numeric checks
+// (steps -> step-count check, title -> title-length check) and isn't
+// trivially always-true by schema construction (id/tags/type). Only
+// meaningful for array/string fields where "present" can mean "empty".
+const UNIFORMITY_EXCLUDED_FIELDS = new Set(['id', 'title', 'steps', 'tags', 'type']);
+
+function average(nums) {
+  return nums.reduce((sum, n) => sum + n, 0) / nums.length;
+}
+
+function isFieldPresent(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return value != null;
+}
+
+/**
+ * Heuristic drift detector, not a completeness axis — see the header
+ * comment for the full rationale. Returns { skipped, stats, warnings }.
+ * warnings is an array of { rule, message } — empty means clean.
+ */
+function checkUniformity(scenarios) {
+  const n = scenarios.length;
+  if (n < UNIFORMITY_MIN_SCENARIOS) {
+    return { skipped: true, n, warnings: [] };
+  }
+
+  const thirdSize = Math.floor(n / 3);
+  const firstThird = scenarios.slice(0, thirdSize);
+  const lastThird = scenarios.slice(n - thirdSize);
+  const warnings = [];
+
+  // 1. Step-count thinning.
+  const firstStepsAvg = average(firstThird.map((s) => (s.steps ?? []).length));
+  const lastStepsAvg = average(lastThird.map((s) => (s.steps ?? []).length));
+  const stepDropPct = firstStepsAvg === 0 ? 0 : ((firstStepsAvg - lastStepsAvg) / firstStepsAvg) * 100;
+  if (stepDropPct > STEP_COUNT_DROP_THRESHOLD_PCT) {
+    warnings.push({
+      rule: 'step-count-thinning',
+      message: `steps avg ${lastStepsAvg.toFixed(1)} (last ${thirdSize}) vs ${firstStepsAvg.toFixed(1)} (first ${thirdSize}), -${stepDropPct.toFixed(0)}% (threshold: -${STEP_COUNT_DROP_THRESHOLD_PCT}%)`,
+    });
+  }
+
+  // 3. Title-length collapse.
+  const firstTitleAvg = average(firstThird.map((s) => (s.title ?? '').length));
+  const lastTitleAvg = average(lastThird.map((s) => (s.title ?? '').length));
+  const titleDropPct = firstTitleAvg === 0 ? 0 : ((firstTitleAvg - lastTitleAvg) / firstTitleAvg) * 100;
+  if (titleDropPct > TITLE_LENGTH_DROP_THRESHOLD_PCT) {
+    warnings.push({
+      rule: 'title-length-collapse',
+      message: `title length avg ${lastTitleAvg.toFixed(1)} (last ${thirdSize}) vs ${firstTitleAvg.toFixed(1)} (first ${thirdSize}), -${titleDropPct.toFixed(0)}% (threshold: -${TITLE_LENGTH_DROP_THRESHOLD_PCT}%)`,
+    });
+  }
+
+  // 2. Field-presence regression. Field list is derived from whatever keys
+  // actually appear on scenarios, not hard-coded, so a future schema
+  // addition is covered automatically without touching this script.
+  const allFields = new Set();
+  for (const s of scenarios) {
+    for (const key of Object.keys(s)) allFields.add(key);
+  }
+  for (const field of allFields) {
+    if (UNIFORMITY_EXCLUDED_FIELDS.has(field)) continue;
+    const firstPresentCount = firstThird.filter((s) => isFieldPresent(s[field])).length;
+    const firstPresentRatio = firstPresentCount / firstThird.length;
+    // Only a field that was actually the norm early on counts as a basis for
+    // comparison — a field that was already sparse in the first third (like
+    // coversAC legitimately can be, e.g. an edge case with no direct AC)
+    // isn't drift regardless of what the last third looks like.
+    if (firstPresentRatio <= 0.5) continue;
+    const lastPresentCount = lastThird.filter((s) => isFieldPresent(s[field])).length;
+    const lastPresentRatio = lastPresentCount / lastThird.length;
+    // The regression that matters is a RATE flip (majority-present ->
+    // majority-absent), not "any single scenario happens to not need this
+    // field" — coversAC/coversEC are legitimately empty on individual
+    // scenarios whose content just doesn't call for them (e.g. CAP-19's
+    // SC-18 has no direct AC), which is normal content variation, not
+    // dilution. One absence out of many that stays majority-present is not
+    // a regression; a field that was the norm becoming the exception is.
+    if (lastPresentRatio <= 0.5) {
+      const missingInLast = lastThird.filter((s) => !isFieldPresent(s[field]));
+      warnings.push({
+        rule: 'field-presence-regression',
+        message: `field "${field}" present in ${firstPresentCount}/${firstThird.length} (${(firstPresentRatio * 100).toFixed(0)}%) first-third scenarios but only ${lastPresentCount}/${lastThird.length} (${(lastPresentRatio * 100).toFixed(0)}%) last-third scenarios — majority flipped from present to absent (e.g. missing on ${missingInLast[0].id})`,
+      });
+    }
+  }
+
+  return {
+    skipped: false,
+    n,
+    thirdSize,
+    stats: { firstStepsAvg, lastStepsAvg, stepDropPct, firstTitleAvg, lastTitleAvg, titleDropPct },
+    warnings,
+  };
+}
+
 function main() {
   const ajv = new Ajv({ allErrors: true, strict: true });
   addFormats(ajv);
@@ -229,7 +341,9 @@ function main() {
     design: ajv.compile(designSchema),
   };
 
-  const targets = resolveTargets(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const strictUniformity = argv.includes('--strict-uniformity');
+  const targets = resolveTargets(argv);
   let anyFailed = false;
 
   for (const target of targets) {
@@ -262,6 +376,8 @@ function main() {
       continue;
     }
 
+    let uniformityNote = '';
+    let hasUniformityWarnings = false;
     if (kind === 'design') {
       const completenessErrors = checkDesignCompleteness(data, target);
       if (completenessErrors.length > 0) {
@@ -271,6 +387,26 @@ function main() {
           console.error(`  ${err}`);
         }
         continue;
+      }
+
+      const uniformity = checkUniformity(data.scenarios ?? []);
+      if (uniformity.skipped) {
+        uniformityNote = `\n  uniformity: skipped (${uniformity.n} scenarios, below the ${UNIFORMITY_MIN_SCENARIOS}-scenario threshold where the signal is meaningful)`;
+      } else {
+        const { firstStepsAvg, lastStepsAvg, stepDropPct, firstTitleAvg, lastTitleAvg, titleDropPct } = uniformity.stats;
+        uniformityNote =
+          `\n  uniformity: ${uniformity.n} scenarios (first/last ${uniformity.thirdSize}) — ` +
+          `steps ${firstStepsAvg.toFixed(1)}->${lastStepsAvg.toFixed(1)} (${stepDropPct >= 0 ? '-' : '+'}${Math.abs(stepDropPct).toFixed(0)}%), ` +
+          `titles ${firstTitleAvg.toFixed(1)}->${lastTitleAvg.toFixed(1)} (${titleDropPct >= 0 ? '-' : '+'}${Math.abs(titleDropPct).toFixed(0)}%)`;
+        if (uniformity.warnings.length > 0) {
+          hasUniformityWarnings = true;
+          for (const w of uniformity.warnings) {
+            uniformityNote += `\n  UNIFORM?  [${w.rule}] ${w.message}`;
+          }
+          if (strictUniformity) {
+            anyFailed = true;
+          }
+        }
       }
     }
 
@@ -303,11 +439,16 @@ function main() {
       mdNote = `  -> MARKDOWN RENDER FAILED: ${err.message}`;
     }
 
-    console.log(`PASS  ${relPath}  (${kind})${mdNote}`);
+    const statusLabel = hasUniformityWarnings ? 'WARN' : 'PASS';
+    console.log(`${statusLabel}  ${relPath}  (${kind})${mdNote}${uniformityNote}`);
   }
 
   if (anyFailed) {
-    console.error('\nValidation failed — do not hand this output downstream.');
+    console.error(
+      strictUniformity
+        ? '\nValidation failed — do not hand this output downstream. (--strict-uniformity: warnings above counted as failures.)'
+        : '\nValidation failed — do not hand this output downstream.'
+    );
     process.exit(1);
   }
   console.log('\nAll files valid.');

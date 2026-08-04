@@ -1,0 +1,687 @@
+{
+  "ticket": {
+    "id": "CAP-19",
+    "requirementsFile": "agent-output/ResearchAgent-Output/CAP-19.requirements.json"
+  },
+  "scenarios": [
+    {
+      "id": "SC-1",
+      "title": "Total balance stat tile reflects the sum of all account balances",
+      "tags": [
+        "@dashboard",
+        "@stat-tile",
+        "@smoke"
+      ],
+      "steps": [
+        "Given the customer's accounts use the default seeded demo data (Chequing, Savings, Aventura Visa)",
+        "When the customer opens the dashboard",
+        "Then the \"Total balance\" stat tile shows the sum of all account balances, matching the known seeded total exactly",
+        "And the \"Across all accounts\" sub-caption is visible under the tile"
+      ],
+      "coversAC": [
+        "AC-1"
+      ],
+      "coversREQ": [
+        "REQ-1",
+        "REQ-11"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); Playwright's fullyParallel default gives every test a fresh, isolated browser context/localStorage, so nothing here can leak into or from another test."
+    },
+    {
+      "id": "SC-2",
+      "title": "Net cash flow tile shows breakdown and positive styling when money in exceeds money out",
+      "tags": [
+        "@dashboard",
+        "@stat-tile"
+      ],
+      "steps": [
+        "Given the customer's accounts use the default seeded demo data, where total money in exceeds total money out",
+        "When the customer opens the dashboard",
+        "Then the \"Net cash flow\" stat tile shows the net amount (money in minus money out)",
+        "And it shows a breakdown of total money in and total money out",
+        "And the tile is styled as positive since the net is greater than zero"
+      ],
+      "coversAC": [
+        "AC-1"
+      ],
+      "coversREQ": [
+        "REQ-2"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); relies on Playwright's per-test fresh browser context/localStorage for isolation."
+    },
+    {
+      "id": "SC-3",
+      "title": "Investment gain/loss tile shows dollar gain and gain percentage with positive styling",
+      "tags": [
+        "@dashboard",
+        "@stat-tile"
+      ],
+      "steps": [
+        "Given the customer's holdings use the default seeded demo data, where market value exceeds cost basis",
+        "When the customer opens the dashboard",
+        "Then the \"Investment gain/loss\" stat tile shows the dollar gain (market value minus cost basis)",
+        "And it shows the gain as a percentage",
+        "And the tile is styled as positive since the gain is greater than zero"
+      ],
+      "coversAC": [
+        "AC-1"
+      ],
+      "coversREQ": [
+        "REQ-3"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); relies on Playwright's per-test fresh browser context/localStorage for isolation."
+    },
+    {
+      "id": "SC-4",
+      "title": "Credit utilization tile is displayed when the customer has a Credit Card account",
+      "tags": [
+        "@dashboard",
+        "@stat-tile",
+        "@credit-utilization"
+      ],
+      "steps": [
+        "Given the customer's accounts include a Credit Card account (the default seeded Aventura Visa)",
+        "When the customer opens the dashboard",
+        "Then a \"Credit utilization\" tile is displayed showing the percentage of credit limit used",
+        "And it shows an \"amount used of limit\" caption",
+        "And it shows a severity-colored progress bar"
+      ],
+      "coversAC": [
+        "AC-1"
+      ],
+      "coversREQ": [
+        "REQ-4"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); relies on Playwright's per-test fresh browser context/localStorage for isolation."
+    },
+    {
+      "id": "SC-5",
+      "title": "Credit utilization tile is absent when the customer has no Credit Card account",
+      "tags": [
+        "@dashboard",
+        "@stat-tile",
+        "@credit-utilization",
+        "@edge-case"
+      ],
+      "steps": [
+        "Given the customer's seed data is replaced, via the dashboard seed fixture, with a state that has no Credit Card type account",
+        "When the customer opens the dashboard",
+        "Then no \"Credit utilization\" tile is rendered among the stat tiles",
+        "And the other stat tiles (Total balance, Net cash flow, Investment gain/loss) still render normally"
+      ],
+      "coversAC": [
+        "AC-1"
+      ],
+      "coversREQ": [
+        "REQ-4"
+      ],
+      "coversEC": [
+        "EC-7"
+      ],
+      "type": "boundary",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "fixtures/dashboardSeed.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Seeds a custom no-credit-card state via the dashboardSeed fixture's page.addInitScript, scoped to this test's own browser context only — no shared storageState or on-disk file is used, so this cannot interfere with any other test's localStorage."
+    },
+    {
+      "id": "SC-6",
+      "title": "Cash flow chart plots money in and money out per date as bars above/below the baseline",
+      "tags": [
+        "@dashboard",
+        "@cash-flow"
+      ],
+      "steps": [
+        "Given the customer's accounts use the default seeded demo data with transactions on multiple dates",
+        "When the customer opens the dashboard with the \"All accounts\" scope selected",
+        "Then the cash flow chart renders one bar per date",
+        "And money-in days render as bars above the baseline and money-out days render as bars below the baseline"
+      ],
+      "coversAC": [
+        "AC-2"
+      ],
+      "coversREQ": [
+        "REQ-5"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); relies on Playwright's per-test fresh browser context/localStorage for isolation."
+    },
+    {
+      "id": "SC-7",
+      "title": "Cash flow chart summary line shows total money in and total money out for the displayed scope",
+      "tags": [
+        "@dashboard",
+        "@cash-flow"
+      ],
+      "steps": [
+        "Given the customer's accounts use the default seeded demo data",
+        "When the customer opens the dashboard with the \"All accounts\" scope selected",
+        "Then the cash flow chart's summary line shows the total money in and total money out for that scope"
+      ],
+      "coversAC": [
+        "AC-2"
+      ],
+      "coversREQ": [
+        "REQ-6"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); relies on Playwright's per-test fresh browser context/localStorage for isolation."
+    },
+    {
+      "id": "SC-8",
+      "title": "Selecting an account chip filters the cash flow and spending charts without changing the account-wide stat tiles",
+      "tags": [
+        "@dashboard",
+        "@scope-filter",
+        "@edge-case"
+      ],
+      "steps": [
+        "Given the customer's accounts use the default seeded demo data with more than one account",
+        "And the customer has opened the dashboard with the \"All accounts\" scope selected",
+        "When the customer clicks a single account's chip in the account filter",
+        "Then the cash flow chart updates to show only that account's transactions",
+        "And the spending-by-category chart updates to show only that account's transactions",
+        "And the Total balance, Investment gain/loss, and Credit utilization tiles remain unchanged, still computed from all accounts"
+      ],
+      "coversAC": [],
+      "coversREQ": [
+        "REQ-7"
+      ],
+      "coversEC": [
+        "EC-8"
+      ],
+      "type": "boundary",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); relies on Playwright's per-test fresh browser context/localStorage for isolation."
+    },
+    {
+      "id": "SC-9",
+      "title": "Spending-by-category chart aggregates outgoing spend, excludes non-spend categories, and sorts by amount descending",
+      "tags": [
+        "@dashboard",
+        "@category-spend"
+      ],
+      "steps": [
+        "Given the customer's transactions use the default seeded demo data, spanning multiple outgoing spend categories plus Income/Transfer/Payment entries",
+        "When the customer opens the dashboard with the \"All accounts\" scope selected",
+        "Then the spending-by-category chart lists only negative-amount transactions, excluding Income, Transfer, and Payment categories",
+        "And the categories are sorted by amount descending",
+        "And each category row shows its percentage of total spending"
+      ],
+      "coversAC": [
+        "AC-3"
+      ],
+      "coversREQ": [
+        "REQ-8"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); relies on Playwright's per-test fresh browser context/localStorage for isolation."
+    },
+    {
+      "id": "SC-10",
+      "title": "Cash flow chart shows its empty state when the selected account scope has zero transactions",
+      "tags": [
+        "@dashboard",
+        "@cash-flow",
+        "@edge-case"
+      ],
+      "steps": [
+        "Given the dashboard seed fixture provides an account that has zero transactions",
+        "And the customer has opened the dashboard",
+        "When the customer selects that account's chip in the account filter",
+        "Then the cash flow chart shows \"No transactions in this view.\" instead of a chart"
+      ],
+      "coversAC": [
+        "AC-2"
+      ],
+      "coversREQ": [
+        "REQ-5"
+      ],
+      "coversEC": [
+        "EC-1"
+      ],
+      "type": "boundary",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "fixtures/dashboardSeed.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Seeds a custom zero-transaction-account state via the dashboardSeed fixture's page.addInitScript, scoped to this test's own browser context only — no shared storageState or on-disk file, so it cannot affect any other test."
+    },
+    {
+      "id": "SC-11",
+      "title": "Spending-by-category chart shows its empty state when the scope's transactions are all excluded categories",
+      "tags": [
+        "@dashboard",
+        "@category-spend",
+        "@edge-case"
+      ],
+      "steps": [
+        "Given the dashboard seed fixture provides an account whose transactions are all Income, Transfer, or Payment category",
+        "And the customer has opened the dashboard",
+        "When the customer selects that account's chip in the account filter",
+        "Then the spending-by-category chart shows \"No spending in this view.\" instead of a category list"
+      ],
+      "coversAC": [
+        "AC-3"
+      ],
+      "coversREQ": [
+        "REQ-8"
+      ],
+      "coversEC": [
+        "EC-2"
+      ],
+      "type": "boundary",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "fixtures/dashboardSeed.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Seeds a custom all-excluded-category-transactions state via the dashboardSeed fixture's page.addInitScript, scoped to this test's own browser context only — no shared storageState or on-disk file, so it cannot affect any other test."
+    },
+    {
+      "id": "SC-12",
+      "title": "Portfolio allocation donut renders segments sized by market value share with a matching legend",
+      "tags": [
+        "@dashboard",
+        "@portfolio"
+      ],
+      "steps": [
+        "Given the customer's holdings use the default seeded demo data with non-zero market value",
+        "When the customer opens the dashboard",
+        "Then the portfolio allocation donut renders one segment per holding, each sized as that holding's percentage of total market value",
+        "And the legend lists each holding's name and value"
+      ],
+      "coversAC": [
+        "AC-4"
+      ],
+      "coversREQ": [
+        "REQ-9"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": "Uses only the app's default seed data (no custom localStorage write); relies on Playwright's per-test fresh browser context/localStorage for isolation."
+    },
+    {
+      "id": "SC-13",
+      "title": "Portfolio donut renders without ",
+      "tags": [
+        "@dashboard",
+        "@portfolio",
+        "@edge-case"
+      ],
+      "steps": [
+        "Given the dashboard seed fixture provides holdings whose market values sum to zero total",
+        "When the customer opens the dashboard"
+      ],
+      "coversAC": [
+        "AC-4"
+      ],
+      "coversREQ": [
+        "REQ-9"
+      ],
+      "coversEC": [],
+      "type": "boundary",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "fixtures/dashboardSeed.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": ""
+    },
+    {
+      "id": "SC-14",
+      "title": "Investment performance chart shows cost bas",
+      "tags": [
+        "@dashboard",
+        "@performance"
+      ],
+      "steps": [
+        "Given the customer's holdings use the default seeded demo data with distinct cost basis and market values",
+        "When the customer opens the dashboard"
+      ],
+      "coversAC": [
+        "AC-4"
+      ],
+      "coversREQ": [
+        "REQ-10"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": ""
+    },
+    {
+      "id": "SC-15",
+      "title": "A zero-cost-basis holding show",
+      "tags": [
+        "@dashboard",
+        "@performance",
+        "@stat-tile",
+        "@edge-case"
+      ],
+      "steps": [
+        "Given the dashboard seed fixture provides a holding with a cost basis of 0",
+        "When the customer opens the dashboard"
+      ],
+      "coversAC": [
+        "AC-1",
+        "AC-4"
+      ],
+      "coversREQ": [
+        "REQ-3",
+        "REQ-10"
+      ],
+      "coversEC": [],
+      "type": "boundary",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "fixtures/dashboardSeed.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": ""
+    },
+    {
+      "id": "SC-16",
+      "title": "Credit utilization tile caps at 100% and sw",
+      "tags": [
+        "@dashboard",
+        "@credit-utilization",
+        "@edge-case"
+      ],
+      "steps": [
+        "Given the dashboard seed fixture provides a Credit Card account whose balance is at or exceeds its credit limit",
+        "When the customer opens the dashboard"
+      ],
+      "coversAC": [
+        "AC-1"
+      ],
+      "coversREQ": [
+        "REQ-4"
+      ],
+      "coversEC": [],
+      "type": "boundary",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "fixtures/dashboardSeed.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": ""
+    },
+    {
+      "id": "SC-17",
+      "title": "Net cash flow and investment gain/loss t",
+      "tags": [
+        "@dashboard",
+        "@stat-tile",
+        "@edge-case"
+      ],
+      "steps": [
+        "Given the dashboard seed fixture provides transactions and holdings that produce a net cash flow of exactly 0 and an investment gain/loss of exactly 0",
+        "When the customer opens the dashboard"
+      ],
+      "coversAC": [
+        "AC-1"
+      ],
+      "coversREQ": [
+        "REQ-2",
+        "REQ-3"
+      ],
+      "coversEC": [],
+      "type": "boundary",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "fixtures/dashboardSeed.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": ""
+    },
+    {
+      "id": "SC-18",
+      "title": "Dashboard shows a loading state and defers ",
+      "tags": [
+        "@dashboard",
+        "@loading"
+      ],
+      "steps": [
+        "Given the customer's account, transaction, and holdings data has not yet finished its simulated fetch",
+        "When the customer navigates to the dashboard",
+        "Then a loading indicator is shown and no stat tiles or charts are rendered"
+      ],
+      "coversAC": [],
+      "coversREQ": [
+        "REQ-12"
+      ],
+      "coversEC": [],
+      "type": "happy-path",
+      "artifacts": [
+        "pages/DashboardPage.ts",
+        "features/dashboard.feature",
+        "steps/dashboard.steps.ts"
+      ],
+      "isolation": "parallel-safe",
+      "isolationNotes": ""
+    }
+  ],
+  "reuse": [
+    {
+      "path": "pages/BasePage.ts",
+      "kind": "page-object",
+      "why": "Provides the shared open(path) navigation helper and currentUrl(); DashboardPage extends this rather than duplicating navigation logic, matching LoginPage/AccountsPage's existing pattern."
+    }
+  ],
+  "newArtifacts": [
+    {
+      "kind": "page-object",
+      "path": "pages/DashboardPage.ts",
+      "purpose": "Encapsulates navigation to /dashboard and intent-named accessors/assertions for the stat tiles, credit meter, account-scope chips, cash flow chart, spending-by-category chart, portfolio donut, and performance dumbbell, so step definitions never touch raw Playwright locators directly.",
+      "mode": "create",
+      "locators": [
+        {
+          "element": "Total balance / Net cash flow / Investment gain/loss stat tile",
+          "selector": "StatTile renders label in a <p> then value in the next <p>; locate via container filtered by label text, e.g. locator('.shadow-card').filter({ hasText: 'Total balance' })"
+        },
+        {
+          "element": "Credit utilization meter",
+          "selector": "getByRole('meter', { name: 'Credit utilization' }) — CreditMeter sets role=\"meter\" and aria-label={label} on the progress-bar div"
+        },
+        {
+          "element": "Credit utilization percentage/caption text",
+          "selector": "Within the meter's tile container: percentage is the bold <p>{pct}%</p>; caption is the following <p> text '{used} used of {limit}'"
+        },
+        {
+          "element": "Account filter chip group",
+          "selector": "getByRole('group', { name: 'Filter by account' }) — chips are getByRole('button', { name: 'All accounts | account name' }) inside it"
+        },
+        {
+          "element": "Cash flow chart bar",
+          "selector": "getByRole('img', { name: /date: [+-]?\\$?/ }) — each <rect> has role=\"img\" and aria-label `${date}: ${amount}`"
+        },
+        {
+          "element": "Cash flow chart empty state",
+          "selector": "getByText('No transactions in this view.')"
+        },
+        {
+          "element": "Cash flow chart summary totals",
+          "selector": "Text nodes 'Money in' / 'Money out' followed by bold spans with the formatted totals, in the div.flex.justify-between below the chart"
+        },
+        {
+          "element": "Spending-by-category row",
+          "selector": "li elements in the ul; category name in the first span, amount in the second span, percentage text 'pct% of total spending' revealed on hover/focus within the li"
+        },
+        {
+          "element": "Spending-by-category empty state",
+          "selector": "getByText('No spending in this view.')"
+        },
+        {
+          "element": "Portfolio donut segment",
+          "selector": "getByRole('img', { name: /holding name: .*%/ }) — each <circle> has role=\"img\" and aria-label `${name}: ${value}, ${pct}%`"
+        },
+        {
+          "element": "Portfolio donut legend row",
+          "selector": "li elements under 'ul.mt-4'; holding name in the first span, value in the second span"
+        },
+        {
+          "element": "Portfolio donut center total label",
+          "selector": "getByText('Market value') for the caption, sibling div for the formatted total"
+        },
+        {
+          "element": "Investment performance dumbbell row",
+          "selector": "getByRole('img', { name: /holding name: cost basis .* current value .*/ }) — each <g> has role=\"img\" and the full aria-label described in PerformanceDumbbell.jsx"
+        },
+        {
+          "element": "Loading indicator",
+          "selector": "getByText('Loading your accounts…') — rendered by AccountsContext while loading is true"
+        }
+      ]
+    },
+    {
+      "kind": "fixture",
+      "path": "fixtures/dashboardSeed.ts",
+      "purpose": "Provides named preset writers (e.g. noCreditCard, zeroTxAccount, allExcludedCategoryAccount, zeroTotalHoldings, zeroCostBasisHolding, overLimitCreditCard, exactZeroCashFlowAndGain) that build a full accounts/transactions/holdings/payees state object matching accountsApi.js's persisted shape ({ version: 2, accounts, transactions, holdings, payees }) and write it into localStorage under key 'app-bank-state' via page.addInitScript before the dashboard is opened, so the app's own loadState() picks it up on first render instead of falling back to src/data.js's default seed.",
+      "mode": "create"
+    },
+    {
+      "kind": "fixture",
+      "path": "fixtures/pages.ts",
+      "purpose": "Add a dashboardPage: DashboardPage entry to the existing PageFixtures type and test.extend(...) block, following the loginPage/accountsPage construction pattern already present, without removing the existing loginPage/accountsPage/loginBrokenPage fixtures.",
+      "mode": "extend"
+    },
+    {
+      "kind": "feature-file",
+      "path": "features/dashboard.feature",
+      "purpose": "Holds the Gherkin scenarios for SC-1 through SC-18 covering the Financial Overview Dashboard's stat tiles, cash flow chart, spending-by-category chart, portfolio donut, investment performance chart, scope filtering, and loading state, tagged @dashboard.",
+      "mode": "create"
+    },
+    {
+      "kind": "step-definition",
+      "path": "steps/dashboard.steps.ts",
+      "purpose": "Step definitions binding dashboard.feature's Given/When/Then text to DashboardPage methods and the dashboardSeed fixture presets, following the createBdd/test pattern used in steps/login.steps.ts.",
+      "mode": "create"
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A-1",
+      "sourceAmbiguityId": "Q-1",
+      "text": "Interpreted REQ-11's 'not a live feed' as: verify displayed dashboard figures match values computed from the known seeded dataset (e.g. SC-1 asserts the exact seeded total-balance sum). Did not add network-interception assertions (e.g. asserting zero external HTTP requests), since the ticket never asked for that and accountsApi.js is already a local-only localStorage-backed module with a simulated-latency Promise, not a real network boundary to intercept."
+    },
+    {
+      "id": "A-2",
+      "sourceAmbiguityId": "Q-2",
+      "text": "Treated all four stat tiles named in the requirements (Total balance REQ-1, Net cash flow REQ-2, Investment gain/loss REQ-3, Credit utilization REQ-4) as contractual behavior in scope for this ticket, not just the 'total balance' example AC-1 calls out by name — each gets its own scenario (SC-1 through SC-4)."
+    },
+    {
+      "id": "A-3",
+      "sourceAmbiguityId": "Q-3",
+      "text": "Treated portfolio allocation (REQ-9, PortfolioDonut) and investment performance (REQ-10, PerformanceDumbbell) as two independently verifiable requirements under AC-4, each with its own happy-path and edge-case scenarios, rather than one inseparable AC-4 test — they are two distinct components in two distinct page sections."
+    },
+    {
+      "id": "A-4",
+      "sourceAmbiguityId": "Q-4",
+      "text": "Treated the account-scope filter chips as in scope for this ticket's test coverage, since the requirements baseline formally captured them as REQ-7 with an explicit related edge case (EC-8); SC-8 tests both the filtering behavior and the documented split (only cash flow/spending charts scope down, not the account-wide stat tiles)."
+    },
+    {
+      "id": "A-5",
+      "sourceAmbiguityId": null,
+      "text": "src/App.jsx defines '/dashboard' with no auth guard or redirect (confirmed by direct Read of App.jsx's Routes), so all scenarios navigate DashboardPage directly to /dashboard rather than performing a full sign-on flow first. If a route guard is added to the app later, DashboardPage.goto() would need to perform login first — this assumption should be revisited then."
+    },
+    {
+      "id": "A-6",
+      "sourceAmbiguityId": null,
+      "text": "The app's default seed data (src/data.js) cannot reach several required edge-case states: a zero-transaction account (EC-1), an account whose transactions are all in excluded categories (EC-2), zero total holdings market value (EC-3), 100%+ credit utilization (EC-4), exact-zero net cash flow / investment gain (EC-5), a zero-cost-basis holding (EC-6), or no Credit Card account at all (EC-7). A new dashboardSeed fixture (fixtures/dashboardSeed.ts) writes custom state matching accountsApi.js's persisted shape into localStorage key 'app-bank-state' (version 2) via page.addInitScript, so each such scenario gets exactly the state it needs without touching the shared seed modules in src/data.js."
+    },
+    {
+      "id": "A-7",
+      "sourceAmbiguityId": null,
+      "text": "A Helix codebase_agent_query run against Dashboard.jsx returned an inconclusive/null result for its component imports (StatTile, CashFlowChart, CategorySpendChart, PortfolioDonut, PerformanceDumbbell), even though direct Read of Dashboard.jsx confirms all five are imported and rendered. Per the Helix/Read split, this plan's locators and page structure were built entirely from direct Read/Grep of Dashboard.jsx and the five chart component files, not from the Helix answer — noting this here since it's a concrete instance of the graph being stale or incomplete for this repo, not just a theoretical risk. A get_session_context_tool to confirm the ingested commit was not available in this session, so freshness could not be independently verified either way."
+    }
+  ],
+  "outOfScope": [],
+  "performanceNote": "This plan has 18 scenarios, well over NFR-001's 6-scenario typical-story threshold, placing it in the 7+ / <=25-minute-ceiling tier rather than the <=15-minute tier. Decision: accept the longer run rather than splitting the ticket. The Dashboard is genuinely one cohesive page spanning four stat tiles plus four independent chart components (cash flow, category spend, portfolio donut, performance dumbbell), each with its own happy-path and at least one first-class edge case from the baseline (EC-1 through EC-8, all of which the ticket's own rationale calls out as real regression risks, e.g. divide-by-zero guards and empty-state branches). Splitting this into multiple tickets/plans would fragment coverage of a single page and make the REQ/EC-to-scenario traceability harder to audit, not easier. Each scenario is a single Playwright test running against a local, no-network, ~250ms-simulated-latency demo app with fullyParallel:true, so wall-clock runtime is expected to stay well inside the 25-minute ceiling despite the scenario count; no ticket split is recommended."
+}
