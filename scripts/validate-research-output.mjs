@@ -40,8 +40,10 @@
 // completeness axis): long generations are where attention dilution shows
 // up — later scenarios quietly getting thinner or dropping a field the
 // earlier ones have. Compares the first third of scenarios[] against the
-// last third (skips the middle, and skips entirely under 9 scenarios, where
-// the signal is meaningless). This is a quality heuristic, not a contract
+// last third (skips the middle, and skips entirely under 15 scenarios,
+// where a single atypical scenario is enough to swing an average past any
+// threshold — confirmed on CAP-15's real 9-scenario plan, see
+// UNIFORMITY_MIN_SCENARIOS below). This is a quality heuristic, not a contract
 // violation — a plan can legitimately trip it and still be correct (e.g. a
 // ticket whose later scenarios really are simpler one-liners) — so by
 // default it only warns. Pass --strict-uniformity to make a warning exit
@@ -228,7 +230,17 @@ function checkDesignCompleteness(plan, designFilePath) {
   return errors;
 }
 
-const UNIFORMITY_MIN_SCENARIOS = 9;
+// 15 (not 9): at 3-per-side (the old floor of 9), a single atypical
+// scenario swings the average by ~33%, which is enough to cross the
+// step-count threshold on its own — confirmed on CAP-15's real 9-scenario
+// plan, where two legitimately short link/no-cross-nav checks landing in
+// the last third produced a confident-looking -31% that was pure sample
+// noise, not drift. ~5 per side is the practical floor where the average
+// stops being dominated by any one scenario. Applies to all three rules
+// uniformly via the single early-return below — the small-sample problem
+// is identical for step-count, field-presence, and title-length, so there
+// is no case for a different floor per rule.
+const UNIFORMITY_MIN_SCENARIOS = 15;
 const STEP_COUNT_DROP_THRESHOLD_PCT = 30;
 const TITLE_LENGTH_DROP_THRESHOLD_PCT = 40;
 // Fields whose "presence" isn't already fully covered by the numeric checks
@@ -391,7 +403,7 @@ function main() {
 
       const uniformity = checkUniformity(data.scenarios ?? []);
       if (uniformity.skipped) {
-        uniformityNote = `\n  uniformity: skipped (${uniformity.n} scenarios, below the ${UNIFORMITY_MIN_SCENARIOS}-scenario threshold where the signal is meaningful)`;
+        uniformityNote = `\n  uniformity: ${uniformity.n} scenarios — skipped (below ${UNIFORMITY_MIN_SCENARIOS}-scenario minimum)`;
       } else {
         const { firstStepsAvg, lastStepsAvg, stepDropPct, firstTitleAvg, lastTitleAvg, titleDropPct } = uniformity.stats;
         uniformityNote =

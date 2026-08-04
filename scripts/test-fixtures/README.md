@@ -9,6 +9,17 @@ they are.
 
 ## `UNIFORMITY-TEST-FIXTURE-drifted.design.json`
 
+**Must stay at 15 scenarios or more.** `validate-research-output.mjs`
+skips the uniformity check entirely below `UNIFORMITY_MIN_SCENARIOS` (15 —
+raised from an original 9 after CAP-15's real 9-scenario plan proved that
+3-per-side is small enough for a single atypical scenario to swing the
+average past a threshold on pure noise). This fixture currently has 18,
+comfortably above the floor. If you ever trim it down, check the new count
+against that constant first — dropping below 15 doesn't make the fixture
+fail loudly, it makes the check silently skip and stop testing anything at
+all, which is worse than deleting the fixture outright because it *looks*
+like coverage that isn't there.
+
 A copy of `agent-output/DesignAgent-Output/CAP-19.design.json` with the last
 third of its scenarios deliberately degraded to simulate attention dilution
 in a long generation:
