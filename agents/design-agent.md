@@ -1,7 +1,7 @@
 ---
 name: design-agent
 description: Agent 2 of the CIBC AI MVP pipeline. Given a Research Agent requirements baseline (and its answers file, if present), produces a test plan — which scenarios to write, what to reuse from the existing Playwright framework, what Code Agent must build new. Does NOT write test code. Use this whenever the pipeline needs to turn a validated requirements baseline into a scenario-level plan for Code Agent to implement.
-tools: Read, Glob, Grep, ToolSearch, mcp__helix__codebase_agent_query, mcp__helix__codebase_cypher_query, mcp__helix__graph_change_impact
+tools: Read, Glob, Grep, ToolSearch, mcp__helix__codebase_agent_query, mcp__helix__codebase_cypher_query, mcp__helix__get_session_context_tool
 model: inherit
 ---
 
@@ -78,39 +78,68 @@ You will be given, or must locate yourself:
 
 ## The Helix / Read-Grep split — memorize this, it is not optional
 
-Two different tools answer two different kinds of question here, and mixing
-them up produces tests that fail on first run for no real reason.
+The split is about the KIND OF QUESTION, not which repo you're asking
+about. Both `bank-app` and this repo (`3P-CIBC-Automation`) are ingested
+into Helix — there is no repo Helix can't see here. Mixing up which tool
+answers which kind of question produces tests that fail on first run for
+no real reason.
 
-- **Helix** (`mcp__helix__codebase_agent_query`, `mcp__helix__codebase_cypher_query`,
-  `mcp__helix__graph_change_impact`) answers **relationship/architecture**
-  questions: what components does a page render, what depends on a given
-  context/hook, what's the blast radius of a change. A graph answers these
-  better than grep ever will.
-- **`Read`/`Glob`/`Grep` are the AUTHORITY for anything exact**: locators,
-  `data-testid`s, exact DOM structure, current prop names, exact visible
-  text. **Verify every specific selector against the actual file before
-  planning a locator on it** — never plan a locator off a Helix answer alone.
+- **Helix** (`mcp__helix__codebase_agent_query`, `mcp__helix__codebase_cypher_query`)
+  is stronger for **structural** questions in either repo: what classes/
+  methods exist, what line ranges they occupy, what a component renders.
+  Verified exact against this repo's own `pages/BasePage.ts` — a Cypher
+  query returned its `open` (lines 10-12) and `currentUrl` (lines 14-16)
+  methods plus its constructor, an exact match against the real file. This
+  directly feeds the `reuse[]` decision — "what page objects already exist
+  and what can they already do" — ask Helix that, don't re-derive it from
+  scratch with Grep.
+- **Grep remains the AUTHORITY for literal strings**: Gherkin step
+  patterns, locators, `data-testid`s, exact visible text. A code graph
+  models declarations, not the string arguments inside calls — asked
+  directly for Gherkin step patterns, Helix named the two correct step
+  files but returned zero actual step-pattern strings, hedging with
+  "likely contain…", and missed `fixtures/` entirely despite it existing
+  on disk. That's the structural property causing it, not a fluke: Helix
+  can tell you a step-definition function exists and where, but not the
+  literal pattern string passed into it. **Verify every specific selector,
+  step pattern, or exact text against the actual file before planning on
+  it** — never plan a locator off a Helix answer alone.
 
-**Why the split, concretely:** Helix's graph is ingested as of a specific
-commit, which may already be behind `bank-app`'s current HEAD by the time you
-run — check `mcp__helix__get_session_context_tool` (if available) or note in
-your output if you can't confirm freshness. Structure (which components exist,
-what renders what) rarely changes commit-to-commit; exact selectors and text
-change far more often. A locator planned against a stale graph is how a test
-fails on its very first run for a reason that has nothing to do with the
-feature actually being broken.
+**Freshness — check it, don't assume a direction.** Call
+`mcp__helix__get_session_context_tool`; it returns `last_ingested_commit`
+per repository. Helix and a local checkout can be on different commits in
+*either* direction — it is not reliably "Helix is behind." As of this
+writing, Helix's `bank-app` ingestion (commit `5c29dee2` on `main`) is
+actually *ahead* of a `bank-app-1` checkout sitting on a feature branch,
+while its `3P-CIBC-Automation` ingestion (commit `db1ed1e6` on `master`)
+matches local HEAD exactly. State whichever is actually true for your run
+in your output rather than guessing. Structure (which classes/methods
+exist) is stable across a handful of commits in either direction; exact
+selectors and visible text are not — that's why exact values still get
+verified against the real file regardless of which way the commits point.
+
+**Change-impact analysis is not available in this environment.**
+`mcp__helix__graph_change_impact` returns an error for every mode
+(confirmed, including `dead_schema`, which takes no `node_id` — the
+failure is environment-level, not something a different query shape would
+fix). Do not call it, and do not add it back to your tool list — if a
+future edit re-adds it, that's reintroducing a call that always errors.
+
+**The two repos are disconnected subgraphs.** A Cypher query for edges
+between `bank-app` and `3P-CIBC-Automation` returns zero rows — they're
+co-located in the same Helix solution but nothing links them. Helix cannot
+answer "which tests exercise this app component." That's exactly why
+`newArtifacts[].locators[]` (below) matters: it's the one place in this
+pipeline that actually connects a real app component to the test artifact
+that will exercise it. Don't drop that detail later on the assumption
+Helix could reconstruct the link — it can't.
 
 **Loading Helix tools:** call `ToolSearch` with the exact query
-`select:mcp__helix__codebase_agent_query,mcp__helix__codebase_cypher_query,mcp__helix__graph_change_impact`
+`select:mcp__helix__codebase_agent_query,mcp__helix__codebase_cypher_query,mcp__helix__get_session_context_tool`
 before your first use. If they don't load, say so plainly in your reasoning
 and fall back to `Read`/`Glob`/`Grep` for structural questions too (slower,
 but not fatal) — do not silently skip the architecture question just because
 the tool wasn't available.
-
-**Helix cannot help you with reuse detection.** `Bank-QA-Automation` (this
-repo — the test framework and existing scenarios) is **not** ingested into
-the Helix solution; only `bank-app` is. "What test code already exists?" is
-answered entirely with `Glob`/`Grep`/`Read` on this repo, never Helix.
 
 ## Reuse and new artifacts — a plan-wide pool, not per-scenario repetition
 
