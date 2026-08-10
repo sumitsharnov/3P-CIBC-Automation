@@ -66,18 +66,47 @@ built.
 
 ## Test framework — Playwright + TypeScript + playwright-bdd
 
+### Dependency: this suite tests a separate app, `bank-app`
+
+Every test here drives `bank-app` (the React demo, a **separate repo** —
+`michaeltanel-tech/bank-app`, locally `bank-app-1`), not anything in this
+repo. This repo contains no copy of that app and does not build one.
+
+By default, `playwright.config.ts` starts it for you via a `webServer`
+block: it runs `npm run dev` in a local checkout and waits for
+`http://localhost:5173` to come up before the suite starts. Two env vars
+control this:
+
+- `BANK_APP_PATH` — path to your local `bank-app` checkout. Defaults to
+  `../bank-app-1` (a sibling-directory guess that holds on this machine's
+  layout but **is not guaranteed elsewhere** — a fresh clone, a teammate's
+  machine, or CI will very likely need this set explicitly, since the app
+  lives in its own repo with no fixed relative position to this one).
+- `BASE_URL` — if set, the `webServer` block is skipped entirely and the
+  suite runs against whatever's already there (already-running local
+  instance on a different port, a deployed environment, a CI job that starts
+  the app itself in a separate step). Playwright can't safely manage a
+  server it didn't start, so this is the escape hatch for "the app is
+  already up, don't touch it."
+
+If neither applies to your setup — `bank-app` isn't at `../bank-app-1` and
+you haven't set either variable — the `webServer` step will fail trying to
+`cd` into a path that doesn't exist. That failure is the intended signal to
+set `BANK_APP_PATH` (or start the app yourself and set `BASE_URL`), not a
+bug in this config.
+
 ### Running the suite
 
 ```
 npm run test:e2e:report
 ```
 
-This generates the BDD spec files (`bddgen`), runs the suite against
-`baseURL` (default `http://localhost:5173` — start `bank-app`'s own dev
-server first, e.g. `npm run dev` in that repo), then **always** regenerates
-the custom HTML report at `test-results/qa-report/index.html`, whether tests
-passed or failed. A failing run is exactly when the report is most useful, so
-report generation isn't skipped on test failure.
+This generates the BDD spec files (`bddgen`), starts (or connects to, per
+above) `bank-app`, runs the suite against `baseURL` (default
+`http://localhost:5173`), then **always** regenerates the custom HTML report
+at `test-results/qa-report/index.html`, whether tests passed or failed. A
+failing run is exactly when the report is most useful, so report generation
+isn't skipped on test failure.
 
 Other scripts:
 - `npm run bddgen` — just (re)generate `.features-gen/` from the `.feature` files, no test run.
