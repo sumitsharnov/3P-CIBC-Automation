@@ -1,0 +1,52 @@
+{
+  "ticket": {
+    "id": "CAP-15",
+    "designFile": "agent-output/DesignAgent-Output/CAP-15.design.json"
+  },
+  "runMode": "generate",
+  "fileOperations": [
+    {
+      "kind": "feature-file",
+      "path": "features/login.feature",
+      "mode": "extend",
+      "content": "@login\nFeature: Sign On to Online Banking\n  ...\n",
+      "purpose": "Extend the existing 3-scenario feature with the Scenario Outlines and scenarios SC-1 through SC-9.",
+      "scenarioIds": ["SC-1", "SC-2", "SC-3", "SC-4", "SC-5", "SC-6", "SC-7", "SC-8", "SC-9"]
+    },
+    {
+      "kind": "step-definition",
+      "path": "steps/login.steps.ts",
+      "mode": "extend",
+      "content": "import { createBdd } from 'playwright-bdd';\nimport { test } from '../fixtures/pages';\n\nconst { Given, When, Then } = createBdd(test);\n// ...\n",
+      "purpose": "Add step definitions for exact error text, disclaimer, forgot-password/register links, no-cross-nav, and repeated submission.",
+      "scenarioIds": ["SC-1", "SC-2", "SC-3", "SC-4", "SC-5", "SC-6", "SC-7", "SC-8", "SC-9"]
+    },
+    {
+      "kind": "page-object",
+      "path": "pages/LoginPage.ts",
+      "mode": "extend",
+      "content": "import { expect, type Page } from '@playwright/test';\nimport { BasePage } from './BasePage';\n\nexport class LoginPage extends BasePage {\n  // ...\n}\n",
+      "purpose": "Add expectDisclaimerVisible(), forgotPasswordLink()/registerLink(), clickForgotPassword()/clickRegister(), expectNoLoginBrokenLink().",
+      "scenarioIds": ["SC-1", "SC-2", "SC-3", "SC-4", "SC-5", "SC-6", "SC-7", "SC-8", "SC-9"]
+    }
+  ],
+  "compile": {
+    "attempts": [
+      {
+        "attempt": 1,
+        "command": "npx tsc --noEmit",
+        "exitCode": 0,
+        "diagnostics": [],
+        "durationMs": 4200
+      }
+    ],
+    "finalStatus": "pass",
+    "passedOnAttempt": 1
+  },
+  "coverage": {
+    "designFile": "agent-output/DesignAgent-Output/CAP-15.design.json",
+    "newArtifactsFulfilled": ["features/login.feature", "steps/login.steps.ts", "pages/LoginPage.ts"],
+    "scenariosCovered": ["SC-1", "SC-2", "SC-3", "SC-4", "SC-5", "SC-6", "SC-7", "SC-8", "SC-9"]
+  },
+  "rewrite": null
+}

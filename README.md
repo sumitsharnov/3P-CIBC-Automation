@@ -33,11 +33,16 @@ under a namespaced type, e.g. `bank-qa-automation-pipeline:research-agent`.
 
 agents/
   research-agent.md                    Agent 1: ticket -> requirements baseline (discovered via the plugin, not .claude/agents/)
+  design-agent.md                      Agent 2: requirements baseline -> scenario-level test plan
+  code-agent.md                        Agent 3: test plan -> real .feature/step/page-object files (the pipeline's only writer)
 
 pipeline/
   schemas/
     research-output.schema.json        Contract for *.requirements.json
     research-answers.schema.json       Contract for *.answers.json
+    design-output.schema.json          Contract for *.design.json
+    code-output.schema.json            Contract for *.code.json (Code Agent's success shape)
+    code-output-error.schema.json      Contract for *.code.error.json (Code Agent's halt shape — a different file, never overwrites a successful run)
   fixtures/
     mock-ticket-*.json                 Hand-written mock tickets for offline testing
 
@@ -46,9 +51,18 @@ agent-output/
     <TICKET>.requirements.json         Canonical, machine-readable — Design Agent consumes this
     <TICKET>.requirements.md           Human-readable rendering of the same data
     <TICKET>.answers.json              Human answers to blocking ambiguities (see below)
+  DesignAgent-Output/
+    <TICKET>.design.json               Canonical, machine-readable — Code Agent consumes this
+    <TICKET>.design.md                 Human-readable rendering of the same data
+  CodeAgent-Output/
+    <TICKET>.code.json                 Canonical, machine-readable — Test Agent consumes this
+    <TICKET>.code.md                   Human-readable rendering of the same data
+    <TICKET>.code.error.json           Present only when Code Agent halted instead of producing output
 
 scripts/
-  validate-research-output.mjs         Schema validation for *.requirements.json and *.answers.json
+  validate-research-output.mjs         Schema validation for *.requirements.json, *.answers.json, and *.design.json
+  validate-code-output.mjs             Schema validation for *.code.json and *.code.error.json
+  render-plan.mjs                      Renders requirements/design/code JSON to their .md siblings
   check-ambiguity-gate.mjs             The blocking-ambiguity gate (see below)
   run-e2e-with-report.mjs              Runs the e2e suite, then always generates the report (see below)
 
@@ -183,13 +197,25 @@ answer the question before the pipeline can continue.
 
 ```
 node scripts/validate-research-output.mjs
+node scripts/validate-code-output.mjs
+npm run validate:all-output          # both, in one sweep
 ```
 
-With no arguments, validates every `*.requirements.json` and `*.answers.json`
-file under `agent-output/ResearchAgent-Output/`. Pass a specific path to
-validate just one file. Exits non-zero on any schema violation — this is a
-hard contract, not documentation; nothing should be handed to Design Agent
-without passing this first.
+With no arguments, `validate-research-output.mjs` validates every
+`*.requirements.json`/`*.answers.json` file under
+`agent-output/ResearchAgent-Output/` and every `*.design.json` under
+`agent-output/DesignAgent-Output/`. `validate-code-output.mjs` validates
+every `*.code.json`/`*.code.error.json` under
+`agent-output/CodeAgent-Output/`. Pass a specific path to validate just one
+file. Exits non-zero on any schema violation — this is a hard contract, not
+documentation; nothing should be handed to the next agent without passing
+this first.
+
+Code Agent's two output shapes (`*.code.json` success, `*.code.error.json`
+halt) dispatch by **filename suffix**, same as `.requirements.json` vs
+`.answers.json` — not by inspecting file content — because they deliberately
+live at different paths (a halt must never overwrite the last known-good
+success file).
 
 **Node version:** both scripts require Node **22+** (they use `fs.globSync`).
 This works locally (tested on v24) but isn't yet pinned anywhere for CI — when
@@ -201,3 +227,29 @@ wiring this into a GitHub Actions workflow, pin the Node version explicitly
 Design Agent's prompt must require reading `<TICKET>.answers.json` if it
 exists, and treat those answers as **authoritative** — overriding its own
 independent reading of the ticket or the code wherever they conflict.
+
+## For Test Agent (build later, recorded now)
+
+Test Agent's structured failure feedback — the thing that drives Code
+Agent's rewrite loop — must be shaped exactly as:
+
+```json
+{ "test_case_name": "...", "source_feature_file": "...", "source_step_file": "...",
+  "error_type": "...", "failing_assertion": "...", "stack_trace": "..." }
+```
+
+one entry per failing test. Code Agent's `rewrite.triggeringFailures[]` in
+`<TICKET>.code.json` expects this shape literally — changing it on Test
+Agent's side breaks the rewrite loop silently, since Ajv only validates each
+agent's own output, not the shape crossing the boundary between two agents.
+
+Test Agent should read `compile.finalStatus` in `<TICKET>.code.json` before
+running anything — `"fail"` means Code Agent never produced a compiling
+suite and there is nothing to execute.
+
+The Code↔Test rewrite loop is capped at 3 round-trips OR 18 minutes
+cumulative wall-clock, whichever hits first. Code Agent reports only its own
+round-trip's timing (`rewrite.startedAt`/`completedAt`); summing elapsed time
+across round-trips and refusing to invoke a 4th is the **orchestrator's**
+job — neither agent tracks the cumulative total itself across separate
+invocations.

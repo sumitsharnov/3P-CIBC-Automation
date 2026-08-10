@@ -8,10 +8,12 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "validate:all-output": "node scripts/validate-research-output.mjs",
+    "validate:all-output": "node scripts/validate-research-output.mjs && node scripts/validate-code-output.mjs",
     "validate:research-output": "node scripts/validate-research-output.mjs --only=research",
     "validate:design-output": "node scripts/validate-research-output.mjs --only=design",
+    "validate:code-output": "node scripts/validate-code-output.mjs --only=code",
     "render:plan": "node scripts/render-plan.mjs",
+    "render:code": "node scripts/render-plan.mjs --only=code",
     "check:ambiguity-gate": "node scripts/check-ambiguity-gate.mjs",
     "bddgen": "bddgen",
     "test:e2e": "npm run bddgen && playwright test",

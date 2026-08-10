@@ -6,16 +6,19 @@
 // with except by re-running this generator.
 //
 // Usage:
-//   node scripts/render-plan.mjs <file.requirements.json|file.design.json> [<file2> ...]
+//   node scripts/render-plan.mjs <file.requirements.json|file.design.json|file.code.json> [<file2> ...]
 //   node scripts/render-plan.mjs --only=research   (regenerate all requirements .md)
 //   node scripts/render-plan.mjs --only=design     (regenerate all design .md)
-//   (no args) -> regenerates every requirements.json and design.json's .md
+//   node scripts/render-plan.mjs --only=code       (regenerate all code .md)
+//   (no args) -> regenerates every requirements.json, design.json, and code.json's .md
 //
-// This is also imported by validate-research-output.mjs, which calls
-// renderRequirementsMarkdown/renderDesignMarkdown directly after a file
-// passes validation, so a stale .md can never sit next to a freshly
-// validated .json — regeneration happens automatically, not as a manual
-// second step someone can forget.
+// This is also imported by validate-research-output.mjs and
+// validate-code-output.mjs, which call renderRequirementsMarkdown/
+// renderDesignMarkdown/renderCodeMarkdown directly after a file passes
+// validation, so a stale .md can never sit next to a freshly validated
+// .json — regeneration happens automatically, not as a manual second step
+// someone can forget. code.error.json (Code Agent's halt envelope) has no
+// markdown rendering — it's already a one-line error, not a document.
 
 import { readFileSync, writeFileSync, existsSync, globSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -25,6 +28,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
 const RESEARCH_OUTPUT_DIR = path.join(REPO_ROOT, 'agent-output', 'ResearchAgent-Output');
 const DESIGN_OUTPUT_DIR = path.join(REPO_ROOT, 'agent-output', 'DesignAgent-Output');
+const CODE_OUTPUT_DIR = path.join(REPO_ROOT, 'agent-output', 'CodeAgent-Output');
 
 function esc(s) {
   return s == null ? '' : String(s);
@@ -270,6 +274,88 @@ export function renderDesignMarkdown(plan, baseline, hasAnswersFile, sourceJsonN
   return lines.join('\n') + '\n';
 }
 
+/**
+ * Renders a <TICKET>.code.json output (Code Agent's success shape) to
+ * markdown, alongside the design plan it implements. designPlan may be null
+ * if that file couldn't be read — coverage/context sections degrade
+ * gracefully rather than throwing.
+ */
+export function renderCodeMarkdown(output, designPlan, sourceJsonName) {
+  const newArtifactsTotal = designPlan ? (designPlan.newArtifacts ?? []).length : null;
+  const scenariosTotal = designPlan ? (designPlan.scenarios ?? []).length : null;
+
+  const lines = [];
+  lines.push(`# ${output.ticket.id} — Generated Code`);
+  lines.push('');
+  lines.push(`**Built from:** \`${output.ticket.designFile}\``);
+  lines.push(`**Run mode:** ${output.runMode}`);
+  lines.push('');
+
+  if (designPlan) {
+    lines.push(
+      `**Coverage:** ${output.coverage.newArtifactsFulfilled.length}/${newArtifactsTotal} newArtifacts fulfilled, ${output.coverage.scenariosCovered.length}/${scenariosTotal} scenarios covered.`
+    );
+  } else {
+    lines.push(`**Coverage:** ${output.coverage.newArtifactsFulfilled.length} newArtifacts fulfilled, ${output.coverage.scenariosCovered.length} scenarios covered (design plan unreadable — totals unavailable).`);
+  }
+  lines.push('');
+
+  lines.push('## Compile');
+  lines.push('');
+  lines.push(`**Final status:** ${checkMark(output.compile.finalStatus === 'pass')} ${output.compile.finalStatus}${output.compile.passedOnAttempt ? ` (passed on attempt ${output.compile.passedOnAttempt})` : ''}`);
+  lines.push('');
+  lines.push('| Attempt | Command | Exit code | Diagnostics |');
+  lines.push('|---------|---------|-----------|-------------|');
+  for (const a of output.compile.attempts) {
+    lines.push(`| ${a.attempt} | \`${esc(a.command)}\` | ${a.exitCode} | ${a.diagnostics.length} |`);
+  }
+  lines.push('');
+  for (const a of output.compile.attempts) {
+    if (a.diagnostics.length === 0) continue;
+    lines.push(`**Attempt ${a.attempt} diagnostics:**`);
+    lines.push('');
+    for (const d of a.diagnostics) {
+      const loc = d.line != null ? `${d.file}:${d.line}${d.column != null ? `:${d.column}` : ''}` : d.file;
+      lines.push(`- ${d.code ? `\`${d.code}\` ` : ''}${loc} — ${esc(d.message)}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('## File Operations');
+  lines.push('');
+  lines.push('| Path | Kind | Mode | Scenarios |');
+  lines.push('|------|------|------|-----------|');
+  for (const op of output.fileOperations) {
+    lines.push(`| \`${op.path}\` | ${op.kind} | ${op.mode} | ${op.scenarioIds.join(', ') || '—'} |`);
+  }
+  lines.push('');
+
+  if (output.runMode === 'rewrite' && output.rewrite) {
+    lines.push('## Rewrite');
+    lines.push('');
+    lines.push(`**Round-trip:** ${output.rewrite.roundTrip}/3`);
+    lines.push(`**Budget exceeded (this round-trip's own view):** ${checkMark(!output.rewrite.budgetExceeded)} ${output.rewrite.budgetExceeded ? 'YES — halt further round-trips' : 'no'}`);
+    lines.push('');
+    lines.push('**Triggering failures:**');
+    lines.push('');
+    lines.push('| Test case | Feature file | Step file | Error type |');
+    lines.push('|-----------|--------------|-----------|------------|');
+    for (const f of output.rewrite.triggeringFailures) {
+      lines.push(`| ${esc(f.test_case_name)} | \`${f.source_feature_file}\` | \`${f.source_step_file}\` | ${esc(f.error_type)} |`);
+    }
+    lines.push('');
+    lines.push(`**Regenerated paths:** ${output.rewrite.regeneratedPaths.map((p) => `\`${p}\``).join(', ')}`);
+    lines.push('');
+  }
+
+  lines.push('---');
+  lines.push(
+    `*Generated from \`${sourceJsonName}\` by scripts/render-plan.mjs — that file is the canonical machine-readable artifact Test Agent consumes; this file is a generated human-readable rendering. Do not hand-edit; re-run the renderer instead.*`
+  );
+
+  return lines.join('\n') + '\n';
+}
+
 function renderAndWriteRequirements(jsonPath) {
   const baseline = JSON.parse(readFileSync(jsonPath, 'utf-8'));
   const answersPath = jsonPath.replace(/\.requirements\.json$/, '.answers.json');
@@ -292,6 +378,16 @@ function renderAndWriteDesign(jsonPath) {
   return mdPath;
 }
 
+function renderAndWriteCode(jsonPath) {
+  const output = JSON.parse(readFileSync(jsonPath, 'utf-8'));
+  const designPath = path.resolve(REPO_ROOT, output.ticket.designFile);
+  const designPlan = existsSync(designPath) ? JSON.parse(readFileSync(designPath, 'utf-8')) : null;
+  const md = renderCodeMarkdown(output, designPlan, path.basename(jsonPath));
+  const mdPath = jsonPath.replace(/\.code\.json$/, '.code.md');
+  writeFileSync(mdPath, md, 'utf-8');
+  return mdPath;
+}
+
 function main() {
   const argv = process.argv.slice(2);
   const onlyArg = argv.find((a) => a.startsWith('--only='));
@@ -305,6 +401,7 @@ function main() {
     const patterns = [];
     if (!only || only === 'research') patterns.push(path.join(RESEARCH_OUTPUT_DIR, '*.requirements.json'));
     if (!only || only === 'design') patterns.push(path.join(DESIGN_OUTPUT_DIR, '*.design.json'));
+    if (!only || only === 'code') patterns.push(path.join(CODE_OUTPUT_DIR, '*.code.json'));
     targets = patterns.flatMap((p) => globSync(p.replace(/\\/g, '/')));
   }
 
@@ -319,8 +416,10 @@ function main() {
       mdPath = renderAndWriteRequirements(target);
     } else if (target.endsWith('.design.json')) {
       mdPath = renderAndWriteDesign(target);
+    } else if (target.endsWith('.code.json')) {
+      mdPath = renderAndWriteCode(target);
     } else {
-      console.error(`Skipping ${target} — not a *.requirements.json or *.design.json file.`);
+      console.error(`Skipping ${target} — not a *.requirements.json, *.design.json, or *.code.json file.`);
       continue;
     }
     console.log(`Rendered ${path.relative(REPO_ROOT, mdPath)}`);

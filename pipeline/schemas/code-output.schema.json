@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "code-agent-output.schema.json",
+  "title": "Code Agent Output — Generated Test Artifacts",
+  "description": "The only SUCCESS shape Code Agent produces, written to agent-output/CodeAgent-Output/<TICKET>.code.json. On invalid input, or when Code Agent's own attempted output fails Ajv validation, a DIFFERENT small ad hoc shape is used instead (pipeline/schemas/code-output-error.schema.json), written to a DIFFERENT file (<TICKET>.code.error.json) — never this schema with error fields bolted on, and never overwriting the last known-good success file. Every fileOperations[] entry's path/kind/mode must trace back to an entry in ticket.designFile's newArtifacts[] (checked by the validator, not this schema — the same way design-output completeness is checked in JS, not JSON Schema).",
+  "type": "object",
+  "required": ["ticket", "runMode", "fileOperations", "compile", "coverage"],
+  "additionalProperties": false,
+  "properties": {
+    "ticket": {
+      "type": "object",
+      "required": ["id", "designFile"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "e.g. CAP-15" },
+        "designFile": {
+          "type": "string",
+          "description": "Path (relative to repo root) to the <TICKET>.design.json this output implements, e.g. agent-output/DesignAgent-Output/CAP-15.design.json. This is the ONLY input Code Agent reads for requirements/scope — the requirements baseline itself is never re-read."
+        }
+      }
+    },
+    "runMode": {
+      "type": "string",
+      "enum": ["generate", "rewrite"],
+      "description": "generate: first full implementation of the design plan — every newArtifacts[] entry should get a fileOperations[] entry. rewrite: Test Agent sent structured failure feedback and ONLY the named failing artifacts were regenerated at per-file granularity — see the rewrite object below, required when this is \"rewrite\"."
+    },
+    "fileOperations": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per file Code Agent created or extended this run. In a rewrite run this is ONLY the regenerated files, never the whole suite. Every path here must resolve to an entry in the design plan's newArtifacts[] (never reuse[]-only) — Code Agent does not invent files beyond what the plan calls for.",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "mode", "content", "scenarioIds"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["page-object", "step-definition", "fixture", "feature-file", "helper"]
+          },
+          "path": {
+            "type": "string",
+            "description": "Repo-relative path, e.g. pages/DashboardPage.ts. Must match a newArtifacts[].path in the design plan named in ticket.designFile."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["create", "extend"],
+            "description": "Copied verbatim from the matching newArtifacts[] entry in the design plan — Code Agent never re-derives create-vs-extend itself."
+          },
+          "content": {
+            "type": "string",
+            "description": "The FULL file content on disk after this operation (the whole file, not a diff) — the same bytes actually written via Write/Edit."
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Optional — what this file operation accomplishes, usually a short restatement of the matching newArtifacts[] entry's purpose."
+          },
+          "scenarioIds": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^SC-[0-9]+$" },
+            "description": "Design scenario IDs this file operation supports. May be empty only for plan-wide infrastructure not tied to a single scenario (e.g. a shared fixtures/pages.ts wiring change touched by many scenarios at once)."
+          }
+        }
+      }
+    },
+    "compile": {
+      "type": "object",
+      "required": ["attempts", "finalStatus", "passedOnAttempt"],
+      "additionalProperties": false,
+      "description": "Result of running `tsc --noEmit` against the whole framework after generating/regenerating files. At most one self-correction retry is allowed (FR-059) — the counter resets on each new generation/rewrite cycle, including each rewrite round-trip.",
+      "properties": {
+        "attempts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "description": "The initial compile attempt, plus (only if it failed) exactly one self-correction retry. Never more than 2.",
+          "items": {
+            "type": "object",
+            "required": ["attempt", "command", "exitCode", "diagnostics"],
+            "additionalProperties": false,
+            "properties": {
+              "attempt": { "type": "integer", "enum": [1, 2] },
+              "command": { "type": "string", "description": "e.g. \"npx tsc --noEmit\"" },
+              "exitCode": { "type": "integer" },
+              "diagnostics": {
+                "type": "array",
+                "description": "Parsed tsc diagnostics for this attempt. Empty array if exitCode is 0.",
+                "items": {
+                  "type": "object",
+                  "required": ["file", "message"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "file": { "type": "string" },
+                    "line": { "type": "integer" },
+                    "column": { "type": "integer" },
+                    "code": { "type": "string", "pattern": "^TS[0-9]+$" },
+                    "message": { "type": "string" }
+                  }
+                }
+              },
+              "durationMs": { "type": "number" }
+            }
+          }
+        },
+        "finalStatus": {
+          "type": "string",
+          "enum": ["pass", "fail"],
+          "description": "\"fail\" means tsc never passed after both attempts — the validator hard-fails this (AC #10), do not hand it to Test Agent even though the JSON itself is schema-valid."
+        },
+        "passedOnAttempt": {
+          "type": ["integer", "null"],
+          "enum": [1, 2, null],
+          "description": "Which attempt's exitCode was 0. null if finalStatus is \"fail\" (still failing after the one retry)."
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["designFile", "newArtifactsFulfilled", "scenariosCovered"],
+      "additionalProperties": false,
+      "properties": {
+        "designFile": { "type": "string", "description": "Same value as ticket.designFile, repeated here for the renderer/validator's convenience." },
+        "newArtifactsFulfilled": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths from ticket.designFile's newArtifacts[] that now have a corresponding fileOperations[] entry. In a generate run this should equal ALL of newArtifacts[].path; in a rewrite run it's only the regenerated subset."
+        },
+        "scenariosCovered": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^SC-[0-9]+$" },
+          "description": "Union of every fileOperations[].scenarioIds this run produced."
+        }
+      }
+    },
+    "rewrite": {
+      "type": ["object", "null"],
+      "description": "Required to be a real object (not null) when runMode is \"rewrite\" — enforced by the validator, same reasoning as design-output's conditional performanceNote requirement, since a plain schema can't express \"required only when a sibling field has a given value.\" Must be null when runMode is \"generate\".",
+      "additionalProperties": false,
+      "required": ["roundTrip", "triggeringFailures", "regeneratedPaths", "budgetExceeded"],
+      "properties": {
+        "roundTrip": {
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "description": "Which of the 3 allowed Code<->Test round-trips this is."
+        },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "budgetExceeded": {
+          "type": "boolean",
+          "description": "True if, as far as Code Agent can tell, this round-trip pushed the cumulative wall-clock spend (across all round-trips for this ticket, including tsc self-correction retries) past the 18-minute cap. Code Agent reports what it can see about its own round-trip; summing elapsed time ACROSS separate invocations and deciding whether to allow a 4th round-trip is the orchestrator's responsibility, not tracked end-to-end by either agent alone."
+        },
+        "triggeringFailures": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Test Agent's structured failure feedback that triggered this rewrite, one entry per failing test.",
+          "items": {
+            "type": "object",
+            "required": ["test_case_name", "source_feature_file", "source_step_file", "error_type", "failing_assertion", "stack_trace"],
+            "additionalProperties": false,
+            "properties": {
+              "test_case_name": { "type": "string" },
+              "source_feature_file": { "type": "string" },
+              "source_step_file": { "type": "string" },
+              "error_type": { "type": "string" },
+              "failing_assertion": { "type": "string" },
+              "stack_trace": { "type": "string" }
+            }
+          }
+        },
+        "regeneratedPaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Should equal fileOperations[].path for this run exactly — a rewrite touches ONLY the failing artifacts (the .feature file, its .steps.ts, and any POM class it touches), never the whole suite."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "code-agent-error-output.schema.json",
+  "title": "Code Agent Error Output — Halt Envelope",
+  "description": "Written to agent-output/CodeAgent-Output/<TICKET>.code.error.json — a DIFFERENT file than the success output (<TICKET>.code.json) — whenever Code Agent halts before producing real file operations: either its input didn't validate against design-output.schema.json (AC #9), or its own attempted success output failed Ajv validation against code-output.schema.json (AC #11). Using a separate filename means a halt never overwrites the last known-good <TICKET>.code.json that Test Agent may still be relying on. This shape is NEVER validated against code-output.schema.json, and code-output.schema.json is never validated against this one — they are two unrelated schemas for two unrelated files, not a oneOf split of one file.",
+  "type": "object",
+  "required": ["ticket", "status", "error"],
+  "additionalProperties": false,
+  "properties": {
+    "ticket": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "e.g. CAP-15" }
+      }
+    },
+    "status": {
+      "const": "error"
+    },
+    "error": {
+      "type": "string",
+      "description": "One-line summary of what halted the run, e.g. \"Input design plan failed schema validation\" or \"Generated output failed Ajv validation against code-output.schema.json\"."
+    },
+    "details": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional: the specific violations — e.g. one Ajv error string per entry, or one missing/mismatched newArtifacts[] path per entry. Omit or leave empty if error alone is sufficiently specific."
+    }
+  }
+}

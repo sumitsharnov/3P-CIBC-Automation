@@ -1,0 +1,9 @@
+{
+  "ticket": { "id": "CAP-99" },
+  "status": "error",
+  "error": "Input design plan failed schema validation against design-output.schema.json",
+  "details": [
+    "scenarios[2] is missing required property 'isolationNotes'",
+    "newArtifacts[0].mode must be one of \"create\", \"extend\" — got \"update\""
+  ]
+}
