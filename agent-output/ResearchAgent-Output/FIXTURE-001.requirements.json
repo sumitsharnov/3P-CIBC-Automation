@@ -1,6 +1,6 @@
 {
   "ticket": {
-    "id": "CAP-2044",
+    "id": "FIXTURE-001",
     "title": "Pay Bills: validate amount before submitting a payment",
     "type": "story",
     "source": "mock",

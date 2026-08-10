@@ -1,4 +1,4 @@
-# CAP-2044 — Pay Bills: validate amount before submitting a payment
+# FIXTURE-001 — Pay Bills: validate amount before submitting a payment
 
 **Type:** story · **Source:** mock · **URL:** —
 
@@ -59,4 +59,4 @@ The Pay Bills one-time payment form needs to give customers clear inline feedbac
 Verified against C:\Users\sumit.kumar1\Documents\bank-app-1\src\pages\PayBills.jsx and the sibling files it depends on: C:\Users\sumit.kumar1\Documents\bank-app-1\src\api\accountsApi.js (payBill function, lines ~160-196) and C:\Users\sumit.kumar1\Documents\bank-app-1\src\data.js (parseAmount, lines 73-78). Notably, non-numeric/zero/negative-amount and insufficient-funds validation already exist server-side in payBill and are already surfaced as an inline role="alert" error in PayBills.jsx — see Q-3. Existing coverage in C:\Users\sumit.kumar1\Documents\bank-app-1\src\pages\PayBills.test.jsx already exercises the happy path and the insufficient-funds case; it does not cover non-numeric input, zero/negative amounts, decimal-place precision, or the quick-pay entry point's validation equivalence (REQ-8).
 
 ---
-*Generated from `CAP-2044.requirements.json` by scripts/render-plan.mjs — that file is the canonical machine-readable artifact; this file is a generated human-readable rendering. Do not hand-edit; re-run the renderer instead.*
+*Generated from `FIXTURE-001.requirements.json` by scripts/render-plan.mjs — that file is the canonical machine-readable artifact; this file is a generated human-readable rendering. Do not hand-edit; re-run the renderer instead.*
