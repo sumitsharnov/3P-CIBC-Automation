@@ -1,0 +1,67 @@
+# Structure and Node/Actions setup adapted from Agata's CAP-43 work
+# (feat/CAP-43-docker-ci).
+#
+# Deliberately does NOT run the Playwright suite. Those tests need bank-app
+# running on :5173, and bank-app is a separate private repo — CI here can't
+# reach it without a token, and this repo is public. Playwright runs locally
+# for now; the plan is to move it into bank-app's own CI later, where the app
+# is already present in the runner and this repo (being public) can be checked
+# out without credentials.
+#
+# Everything below needs no app under test, so it can and does go green.
+
+name: CI Checks
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Validate agent output against schemas
+        run: npm run validate:all-output
+
+      # FIXTURE-001 has an unresolved blocking ambiguity and no answers file,
+      # so the gate must refuse it. Exit 1 is the pass condition here — a 0
+      # would mean the gate has stopped blocking, which is the failure we care
+      # about catching.
+      - name: Ambiguity gate blocks unresolved blocking ambiguities
+        run: |
+          set +e
+          node scripts/check-ambiguity-gate.mjs \
+            agent-output/ResearchAgent-Output/FIXTURE-001.requirements.json
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::Expected exit 1 (unresolved blocking ambiguity), got $code"
+            exit 1
+          fi
+          echo "Gate correctly blocked FIXTURE-001."
+
+      # CAP-19 has an answers file resolving its blocking ambiguities, so the
+      # gate must let it through.
+      - name: Ambiguity gate passes once answers exist
+        run: |
+          node scripts/check-ambiguity-gate.mjs \
+            agent-output/ResearchAgent-Output/CAP-19.requirements.json
+
+      - name: Every Gherkin step has a definition
+        run: npx bddgen
