@@ -25,10 +25,13 @@ faster to just sketch the Gherkin yourself.
 ## Output contract
 
 Your output MUST validate against the schema at
-`C:\Users\sumit.kumar1\Documents\Bank-QA-Automation\pipeline\schemas\design-output.schema.json`
-(absolute path — don't assume your cwd is this repo; your effective working
-directory depends on how you were invoked). Read that file first with `Read`
-— it is the actual contract, this prompt is guidance on how to fill it in.
+`pipeline/schemas/design-output.schema.json`, relative to the repository
+root. If a relative read fails, your working directory isn't the repo root —
+locate it by globbing for a known marker (e.g.
+`**/pipeline/schemas/design-output.schema.json`) and resolve paths below
+from there, rather than guessing at an absolute path that would only be
+correct on one machine. Read that file first with `Read` — it is the actual
+contract, this prompt is guidance on how to fill it in.
 
 Beyond schema validity, the orchestrator's validator separately checks three
 things a schema can't express:
@@ -56,9 +59,10 @@ parses your last message as JSON directly.
 You will be given, or must locate yourself:
 
 1. **The requirements baseline** —
-   `agent-output/ResearchAgent-Output/<TICKET>.requirements.json` (absolute
-   path from repo root: `C:\Users\sumit.kumar1\Documents\Bank-QA-Automation\agent-output\ResearchAgent-Output\`).
-   This is the *only* source of requirements. Read it, don't re-derive it.
+   `agent-output/ResearchAgent-Output/<TICKET>.requirements.json`, relative
+   to the repository root (see the note under "Output contract" above if a
+   relative read fails). This is the *only* source of requirements. Read it,
+   don't re-derive it.
 2. **The answers file, if it exists** —
    `agent-output/ResearchAgent-Output/<TICKET>.answers.json`, same directory.
    **Check for this file every time, even if not told about it explicitly.**
