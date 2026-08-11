@@ -225,6 +225,49 @@ This works locally (tested on v24) but isn't yet pinned anywhere for CI — when
 wiring this into a GitHub Actions workflow, pin the Node version explicitly
 (e.g. `actions/setup-node` with `node-version: '22'` or later).
 
+## Branches: `master` and `stable`
+
+Two long-lived branches, with different jobs.
+
+**`master`** — ongoing work. May be mid-change at any moment. Nothing outside this
+repo consumes it.
+
+**`stable`** — the published target. Only ever fast-forwarded from `master` once the
+suite is known good. **`bank-app`'s smoke-test CI clones this branch**, not `master`.
+
+The point of the split: `bank-app` is a separate repo owned by someone else, and its CI
+runs this test suite against the app. Without `stable`, a half-finished test pushed here
+would turn their build red — and they'd be debugging their app for a problem that
+originated in ours. Pushing to `master` deliberately has **no effect** on `bank-app`'s CI.
+
+### Promoting
+
+Run all of these from a clean `master` first. Every one must pass:
+
+```
+npx tsc --noEmit                                    # exit 0
+npm run validate:all-output                         # exit 0
+npx bddgen                                          # exit 0
+npx playwright test                                 # all pass — needs bank-app on :5173
+node scripts/check-ambiguity-gate.mjs \
+  agent-output/ResearchAgent-Output/FIXTURE-001.requirements.json   # exit 1 — must BLOCK
+node scripts/check-ambiguity-gate.mjs \
+  agent-output/ResearchAgent-Output/CAP-19.requirements.json        # exit 0
+```
+
+Note the FIXTURE-001 check passes on exit **1** — that fixture carries an unresolved
+blocking ambiguity, so the gate refusing it is the correct outcome. An exit 0 there means
+the gate has stopped blocking, which is the regression worth catching.
+
+Then:
+
+```
+git push origin master:stable
+```
+
+Fast-forward only. If that's rejected as non-fast-forward, `stable` has diverged — work
+out why rather than forcing it.
+
 ## For Design Agent (build later, recorded now)
 
 Design Agent's prompt must require reading `<TICKET>.answers.json` if it
