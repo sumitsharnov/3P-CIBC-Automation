@@ -1,12 +1,5 @@
 {
   "mcpServers": {
-    "helix": {
-      "type": "http",
-      "url": "https://helix-mcp.3pillarglobal.com/helix-atlas/mcp",
-      "headers": {
-        "x-solution-id": "588"
-      }
-    },
     "atlassian": {
       "type": "http",
       "url": "https://mcp.atlassian.com/v1/mcp/authv2"
