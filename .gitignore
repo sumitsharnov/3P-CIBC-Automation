@@ -7,3 +7,8 @@ blob-report/
 .features-gen/
 *.log
 .env
+
+# render-plan.mjs regenerates a .md sibling next to any *.requirements.json/
+# *.design.json/*.code.json it validates - including test fixtures, which
+# aren't real agent output and shouldn't be committed.
+scripts/test-fixtures/*TEST-FIXTURE*.md
