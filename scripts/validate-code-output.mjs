@@ -23,7 +23,14 @@
 //   npm run validate:code-output              -> --only=code
 //
 // With no arguments and no --only flag, validates every *.code.json and
-// *.code.error.json under agent-output/CodeAgent-Output/.
+// *.code.error.json under agent-output/CodeAgent-Output/ — and, if that
+// folder has nothing yet (a fresh clone, or a repo state where research/
+// design have run but no ticket has reached Code Agent), exits 0 with an
+// informational message rather than failing. That's what makes
+// `npm run validate:all-output` safe to run before Code Agent has ever
+// produced anything. An EXPLICIT request — --only=code, or a specific path
+// — finding zero matches is still a hard error (exit 2): that means you
+// asked for something specific and it isn't there.
 //
 // Code-output completeness checks (cross-file, none expressible in JSON
 // Schema alone — same reasoning as validate-research-output.mjs's
@@ -77,6 +84,16 @@ function resolveTargets(argv) {
     return pathArgs.map((p) => path.resolve(p));
   }
 
+  // An explicit request (a specific --only=<kind>, or a specific path
+  // above) that finds nothing IS an error — you asked for something and
+  // it's not there. The implicit default sweep (no args at all, as run by
+  // `npm run validate:all-output`) finding nothing is NOT an error: before
+  // any ticket has reached Code Agent (a fresh clone, or research/design
+  // are the only stages that have run so far), agent-output/CodeAgent-Output/
+  // is legitimately empty, and that must not fail CI for a stage that
+  // simply hasn't run yet.
+  const isExplicitRequest = Boolean(onlyArg);
+
   let patterns;
   let describeScope;
   if (onlyArg) {
@@ -94,8 +111,11 @@ function resolveTargets(argv) {
 
   const matches = patterns.flatMap((pattern) => globSync(pattern.replace(/\\/g, '/')));
   if (matches.length === 0) {
-    console.error(`No files found for ${describeScope}.`);
-    process.exit(2);
+    if (isExplicitRequest) {
+      console.error(`No files found for ${describeScope}.`);
+      process.exit(2);
+    }
+    return [];
   }
   return matches;
 }
@@ -319,6 +339,13 @@ function main() {
 
   const argv = process.argv.slice(2);
   const targets = resolveTargets(argv);
+  if (targets.length === 0) {
+    // Only reachable from the implicit default sweep (see resolveTargets) —
+    // an explicit --only=code or explicit path with zero matches already
+    // exited 2 above. Nothing to validate yet is not a failure.
+    console.log('No CodeAgent-Output files yet — nothing to validate. (Not a failure: this stage has not run yet.)');
+    return;
+  }
   let anyFailed = false;
 
   for (const target of targets) {
