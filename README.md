@@ -80,18 +80,47 @@ built.
 
 ## Test framework — Playwright + TypeScript + playwright-bdd
 
+### Dependency: this suite tests a separate app, `bank-app`
+
+Every test here drives `bank-app` (the React demo, a **separate repo** —
+`michaeltanel-tech/bank-app`, locally `bank-app-1`), not anything in this
+repo. This repo contains no copy of that app and does not build one.
+
+By default, `playwright.config.ts` starts it for you via a `webServer`
+block: it runs `npm run dev` in a local checkout and waits for
+`http://localhost:5173` to come up before the suite starts. Two env vars
+control this:
+
+- `BANK_APP_PATH` — path to your local `bank-app` checkout. Defaults to
+  `../bank-app-1` (a sibling-directory guess that holds on this machine's
+  layout but **is not guaranteed elsewhere** — a fresh clone, a teammate's
+  machine, or CI will very likely need this set explicitly, since the app
+  lives in its own repo with no fixed relative position to this one).
+- `BASE_URL` — if set, the `webServer` block is skipped entirely and the
+  suite runs against whatever's already there (already-running local
+  instance on a different port, a deployed environment, a CI job that starts
+  the app itself in a separate step). Playwright can't safely manage a
+  server it didn't start, so this is the escape hatch for "the app is
+  already up, don't touch it."
+
+If neither applies to your setup — `bank-app` isn't at `../bank-app-1` and
+you haven't set either variable — the `webServer` step will fail trying to
+`cd` into a path that doesn't exist. That failure is the intended signal to
+set `BANK_APP_PATH` (or start the app yourself and set `BASE_URL`), not a
+bug in this config.
+
 ### Running the suite
 
 ```
 npm run test:e2e:report
 ```
 
-This generates the BDD spec files (`bddgen`), runs the suite against
-`baseURL` (default `http://localhost:5173` — start `bank-app`'s own dev
-server first, e.g. `npm run dev` in that repo), then **always** regenerates
-the custom HTML report at `test-results/qa-report/index.html`, whether tests
-passed or failed. A failing run is exactly when the report is most useful, so
-report generation isn't skipped on test failure.
+This generates the BDD spec files (`bddgen`), starts (or connects to, per
+above) `bank-app`, runs the suite against `baseURL` (default
+`http://localhost:5173`), then **always** regenerates the custom HTML report
+at `test-results/qa-report/index.html`, whether tests passed or failed. A
+failing run is exactly when the report is most useful, so report generation
+isn't skipped on test failure.
 
 Other scripts:
 - `npm run bddgen` — just (re)generate `.features-gen/` from the `.feature` files, no test run.
@@ -221,6 +250,49 @@ success file).
 This works locally (tested on v24) but isn't yet pinned anywhere for CI — when
 wiring this into a GitHub Actions workflow, pin the Node version explicitly
 (e.g. `actions/setup-node` with `node-version: '22'` or later).
+
+## Branches: `master` and `stable`
+
+Two long-lived branches, with different jobs.
+
+**`master`** — ongoing work. May be mid-change at any moment. Nothing outside this
+repo consumes it.
+
+**`stable`** — the published target. Only ever fast-forwarded from `master` once the
+suite is known good. **`bank-app`'s smoke-test CI clones this branch**, not `master`.
+
+The point of the split: `bank-app` is a separate repo owned by someone else, and its CI
+runs this test suite against the app. Without `stable`, a half-finished test pushed here
+would turn their build red — and they'd be debugging their app for a problem that
+originated in ours. Pushing to `master` deliberately has **no effect** on `bank-app`'s CI.
+
+### Promoting
+
+Run all of these from a clean `master` first. Every one must pass:
+
+```
+npx tsc --noEmit                                    # exit 0
+npm run validate:all-output                         # exit 0
+npx bddgen                                          # exit 0
+npx playwright test                                 # all pass — needs bank-app on :5173
+node scripts/check-ambiguity-gate.mjs \
+  agent-output/ResearchAgent-Output/FIXTURE-001.requirements.json   # exit 1 — must BLOCK
+node scripts/check-ambiguity-gate.mjs \
+  agent-output/ResearchAgent-Output/CAP-19.requirements.json        # exit 0
+```
+
+Note the FIXTURE-001 check passes on exit **1** — that fixture carries an unresolved
+blocking ambiguity, so the gate refusing it is the correct outcome. An exit 0 there means
+the gate has stopped blocking, which is the regression worth catching.
+
+Then:
+
+```
+git push origin master:stable
+```
+
+Fast-forward only. If that's rejected as non-fast-forward, `stable` has diverged — work
+out why rather than forcing it.
 
 ## For Design Agent (build later, recorded now)
 

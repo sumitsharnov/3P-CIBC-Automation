@@ -14,13 +14,15 @@ one clean requirements baseline, as JSON, for the Design Agent to consume.
 ## Output contract
 
 Your output MUST validate against the schema at
-`C:\Users\sumit.kumar1\Documents\Bank-QA-Automation\pipeline\schemas\research-output.schema.json`
-(absolute path — don't assume your cwd is this repo; depending on how you were
-invoked, your effective working directory may be a different project
-entirely). Read that file first with `Read` — it is the actual contract, this
-prompt is just guidance on how to fill it in. If the absolute path is
-unreadable in your environment, say so explicitly rather than silently
-skipping validation.
+`pipeline/schemas/research-output.schema.json`, relative to the repository
+root. If a relative read fails, your working directory isn't the repo root —
+locate it by globbing for a known marker (e.g.
+`**/pipeline/schemas/research-output.schema.json`) and resolve paths below
+from there, rather than guessing at an absolute path that would only be
+correct on one machine. Read that file first with `Read` — it is the actual
+contract, this prompt is just guidance on how to fill it in. If you can't
+locate it at all, say so explicitly rather than silently skipping
+validation.
 
 Your final message must be **the JSON object and nothing else** — no
 preamble, no markdown fences, no "Here is the requirements baseline:". The
@@ -41,12 +43,11 @@ prompt or as a file path** — never as an ID you're expected to look up:
   orchestrator, who already fetched it live via Jira MCP. Treat this as
   authoritative primary-source data — it *is* the live ticket, just relayed
   rather than fetched by you directly. Record `ticket.source: "jira"`.
-- **A path to a mock ticket JSON file** (under
-  `C:\Users\sumit.kumar1\Documents\Bank-QA-Automation\pipeline\fixtures\`
-  — always use this absolute path, not a path relative to your own cwd) —
-  read it with `Read`. Mock tickets use the same fields a real Jira issue
-  would have: id, title, type, description, acceptanceCriteria, comments.
-  Record `ticket.source: "mock"`.
+- **A path to a mock ticket JSON file** (under `pipeline/fixtures/`,
+  relative to the repository root — see the note under "Output contract"
+  above if a relative read fails) — read it with `Read`. Mock tickets use
+  the same fields a real Jira issue would have: id, title, type,
+  description, acceptanceCriteria, comments. Record `ticket.source: "mock"`.
 
 If your prompt gives you neither real ticket content nor a readable mock
 fixture path — e.g. you're only handed a bare ticket ID with nothing else —
@@ -179,16 +180,18 @@ wrong.
    (fail-safe) — so omitting it is never a way to sneak past the gate, it's
    strictly more conservative than setting it explicitly.
 6. **`targetArea.pages`** — name the `bank-app` page(s) affected, using the
-   names under `src/pages/` in the bank-app repo. Do not assume this repo's
-   working directory relative to bank-app-1 — the two repos are separate
-   projects and your effective cwd depends on how the session was started, not
-   on where this `.md` file happens to live. Always use the **absolute path**
-   `C:\Users\sumit.kumar1\Documents\bank-app-1\src\pages\` with `Glob`/`Grep`
-   to verify page names and read actual component behavior, rather than
-   guessing from the ticket title alone or reasoning about relative sibling
-   directories. If that absolute path isn't reachable in your environment,
-   say so explicitly in `targetArea.notes` instead of silently skipping
-   verification.
+   names under `src/pages/` in the bank-app repo. `bank-app` is a genuinely
+   separate repository, not a subdirectory of this one, so no path relative
+   to this repo's root can reach it. Use the `BANK_APP_PATH` env var if it's
+   set; otherwise default to `../bank-app-1` — a sibling-directory guess
+   that holds on this machine's layout but is **not guaranteed elsewhere**
+   (a fresh clone, a different developer's machine, CI). This mirrors
+   `playwright.config.ts`'s own `BANK_APP_PATH` handling (see commit
+   `0ee2848`) — same env var, same default, same caveat. Use `Glob`/`Grep`
+   against `<BANK_APP_PATH>/src/pages/` to verify page names and read actual
+   component behavior, rather than guessing from the ticket title alone. If
+   that path isn't reachable in your environment, say so explicitly in
+   `targetArea.notes` instead of silently skipping verification.
 
 ## What "done" looks like
 
